@@ -1,4 +1,4 @@
-from guizero import App, Text, PushButton, Box
+from guizero import App, Text, PushButton, Box, Combo
 
 def main_screen():
     # Function to display the main screen
@@ -97,7 +97,14 @@ def settings_screen(main_app):
     
     settings_box = Box(settings_app, border=True, width="fill", align="top")
     
-    settings_text = Text(settings_box, text="Language: English\nFont Size: 12\nScreen Color: White")
+    language_text = Text(settings_box, text="Language:")
+    language_combo = Combo(settings_box, options=["English", "Spanish", "Chinese", "Japanese"])
+    
+    font_size_text = Text(settings_box, text="Font Size:")
+    font_size_combo = Combo(settings_box, options=["Small", "Medium", "Large"])
+    
+    color_mode_text = Text(settings_box, text="Color Mode:")
+    color_mode_combo = Combo(settings_box, options=["Dark Mode", "Light Mode"])
     
     back_button = PushButton(settings_box, text="Back", command=lambda: back_to_main(settings_app))
     
