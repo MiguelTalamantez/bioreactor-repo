@@ -1,114 +1,196 @@
-from guizero import App, Text, PushButton, Box, Combo
+import customtkinter as ctk
 
 def main_screen():
     # Function to display the main screen
-    app = App(title="NIMBLE", bg="#F0F0F0", height=400, width=600)
+    app = ctk.CTk()
+    app.title("NIMBLE")
+    app.geometry("600x400")
     
-    header_text = Text(app, text="NIMBLE", size=24, font="Arial", color="#007bff")
+    ctk.set_appearance_mode("System")
+    ctk.set_default_color_theme("blue")
     
-    options_box = Box(app, border=True, width="fill", align="top", layout="grid")
+    header_text = ctk.CTkLabel(app, text="NIMBLE", font=("Arial", 36), text_color="#007bff")
+    header_text.pack(pady=20)
     
-    stats_button = PushButton(options_box, text="View Bioreactor Stats", command=lambda: stats_screen(app), grid=[0,0], width=20, height=3)
-    setpoints_button = PushButton(options_box, text="Set Control System Setpoints", command=lambda: setpoints_screen(app), grid=[1,0], width=20, height=3)
-    settings_button = PushButton(options_box, text="Settings", command=lambda: settings_screen(app), grid=[2,0], width=20, height=3)
+    options_frame = ctk.CTkFrame(app)
+    options_frame.pack(pady=20)
     
-    app.display()
+    stats_button = ctk.CTkButton(options_frame, text="View Bioreactor Stats", command=lambda: stats_screen(app))
+    stats_button.pack(side="left", padx=10)
+    
+    setpoints_button = ctk.CTkButton(options_frame, text="Set Control System Setpoints", command=lambda: setpoints_screen(app))
+    setpoints_button.pack(side="left", padx=10)
+    
+    settings_button = ctk.CTkButton(options_frame, text="Settings", command=lambda: settings_screen(app))
+    settings_button.pack(side="left", padx=10)
+    
+    app.mainloop()
 
 def stats_screen(main_app):
     # Function to display the stats screen
     main_app.destroy()
-    stats_app = App(title="Bioreactor Status", bg="#F0F0F0", height=400, width=600)
+    stats_app = ctk.CTk()
+    stats_app.title("Bioreactor Status")
+    stats_app.geometry("600x400")
     
-    header_text = Text(stats_app, text="Bioreactor Status", size=24, font="Arial", color="#007bff", align="top")
+    header_text = ctk.CTkLabel(stats_app, text="Bioreactor Status", font=("Arial", 36), text_color="#007bff")
+    header_text.pack(pady=20)
     
-    stats_box = Box(stats_app, border=True, width="fill", align="top", layout="grid")
+    stats_frame = ctk.CTkFrame(stats_app)
+    stats_frame.pack(pady=20)
     
     # Header Row
-    Text(stats_box, text="**Measurement**", grid=[0,0], align="center", font=("Arial", 14, "bold"))
-    Text(stats_box, text="**Value**", grid=[1,0], align="center", font=("Arial", 14, "bold"))
+    header_frame = ctk.CTkFrame(stats_frame)
+    header_frame.pack(fill="x")
+    
+    measurement_text = ctk.CTkLabel(header_frame, text="**Measurement**", font=("Arial", 18, "bold"))
+    measurement_text.pack(side="left", expand=True)
+    
+    value_text = ctk.CTkLabel(header_frame, text="**Value**", font=("Arial", 18, "bold"))
+    value_text.pack(side="left", expand=True)
     
     # Temperature Row
-    Text(stats_box, text="Temperature", grid=[0,1], align="center")
-    Text(stats_box, text="25°C", grid=[1,1], align="center")
+    temp_frame = ctk.CTkFrame(stats_frame)
+    temp_frame.pack(fill="x")
+    
+    temp_measurement_text = ctk.CTkLabel(temp_frame, text="Temperature", font=("Arial", 14))
+    temp_measurement_text.pack(side="left", expand=True)
+    
+    temp_value_text = ctk.CTkLabel(temp_frame, text="25°C", font=("Arial", 14))
+    temp_value_text.pack(side="left", expand=True)
     
     # pH Row
-    Text(stats_box, text="pH", grid=[0,2], align="center")
-    Text(stats_box, text="7.0", grid=[1,2], align="center")
+    ph_frame = ctk.CTkFrame(stats_frame)
+    ph_frame.pack(fill="x")
+    
+    ph_measurement_text = ctk.CTkLabel(ph_frame, text="pH", font=("Arial", 14))
+    ph_measurement_text.pack(side="left", expand=True)
+    
+    ph_value_text = ctk.CTkLabel(ph_frame, text="7.0", font=("Arial", 14))
+    ph_value_text.pack(side="left", expand=True)
     
     # Optical Density Row
-    Text(stats_box, text="Optical Density", grid=[0,3], align="center")
-    Text(stats_box, text="0.5", grid=[1,3], align="center")
+    od_frame = ctk.CTkFrame(stats_frame)
+    od_frame.pack(fill="x")
+    
+    od_measurement_text = ctk.CTkLabel(od_frame, text="Optical Density", font=("Arial", 14))
+    od_measurement_text.pack(side="left", expand=True)
+    
+    od_value_text = ctk.CTkLabel(od_frame, text="0.5", font=("Arial", 14))
+    od_value_text.pack(side="left", expand=True)
     
     # Dissolved Oxygen Row
-    Text(stats_box, text="Dissolved Oxygen", grid=[0,4], align="center")
-    Text(stats_box, text="5.0 mg/L", grid=[1,4], align="center")
+    do_frame = ctk.CTkFrame(stats_frame)
+    do_frame.pack(fill="x")
     
-    back_button = PushButton(stats_box, text="Back", command=lambda: back_to_main(stats_app), grid=[0,5], align="left")
+    do_measurement_text = ctk.CTkLabel(do_frame, text="Dissolved Oxygen", font=("Arial", 14))
+    do_measurement_text.pack(side="left", expand=True)
     
-    stats_app.display()
+    do_value_text = ctk.CTkLabel(do_frame, text="5.0 mg/L", font=("Arial", 14))
+    do_value_text.pack(side="left", expand=True)
+    
+    back_button = ctk.CTkButton(stats_app, text="Back", command=lambda: back_to_main(stats_app))
+    back_button.pack(pady=20)
+    
+    stats_app.mainloop()
 
 def setpoints_screen(main_app):
     # Function to display the setpoints screen
     main_app.destroy()
-    setpoints_app = App(title="Input Value", bg="#F0F0F0", height=400, width=600)
+    setpoints_app = ctk.CTk()
+    setpoints_app.title("Input Value")
+    setpoints_app.geometry("600x400")
     
-    header_text = Text(setpoints_app, text="Input Value", size=24, font="Arial", color="#007bff")
+    header_text = ctk.CTkLabel(setpoints_app, text="Input Value", font=("Arial", 36), text_color="#007bff")
+    header_text.pack(pady=20)
     
-    setpoints_box = Box(setpoints_app, border=True, width="fill", align="top", layout="grid")
+    setpoints_frame = ctk.CTkFrame(setpoints_app)
+    setpoints_frame.pack(pady=20)
     
     # Temperature Row
-    Text(setpoints_box, text="Temperature", grid=[0,0], align="left")
+    temp_frame = ctk.CTkFrame(setpoints_frame)
+    temp_frame.pack(fill="x")
+    
+    temp_text = ctk.CTkLabel(temp_frame, text="Temperature", font=("Arial", 14))
+    temp_text.pack(side="left")
     
     temp_value = 25.0
-    temp_text = Text(setpoints_box, text=f"{temp_value}°C", grid=[1,0], align="center")
+    temp_value_text = ctk.CTkLabel(temp_frame, text=f"{temp_value}°C", font=("Arial", 14))
+    temp_value_text.pack(side="left", padx=10)
     
-    minus_temp_button = PushButton(setpoints_box, text="-", command=lambda: update_temp(temp_text, -0.5), grid=[2,0], width=5)
-    plus_temp_button = PushButton(setpoints_box, text="+", command=lambda: update_temp(temp_text, 0.5), grid=[3,0], width=5)
+    minus_temp_button = ctk.CTkButton(temp_frame, text="-", command=lambda: update_temp(temp_value_text, -0.5))
+    minus_temp_button.pack(side="left", padx=5)
+    
+    plus_temp_button = ctk.CTkButton(temp_frame, text="+", command=lambda: update_temp(temp_value_text, 0.5))
+    plus_temp_button.pack(side="left", padx=5)
     
     # pH Row
-    Text(setpoints_box, text="pH", grid=[0,1], align="left")
+    ph_frame = ctk.CTkFrame(setpoints_frame)
+    ph_frame.pack(fill="x")
+    
+    ph_text = ctk.CTkLabel(ph_frame, text="pH", font=("Arial", 14))
+    ph_text.pack(side="left")
     
     ph_value = 7.0
-    ph_text = Text(setpoints_box, text=f"{ph_value:.1f}", grid=[1,1], align="center")
+    ph_value_text = ctk.CTkLabel(ph_frame, text=f"{ph_value:.1f}", font=("Arial", 14))
+    ph_value_text.pack(side="left", padx=10)
     
-    minus_ph_button = PushButton(setpoints_box, text="-", command=lambda: update_ph(ph_text, -0.1), grid=[2,1], width=5)
-    plus_ph_button = PushButton(setpoints_box, text="+", command=lambda: update_ph(ph_text, 0.1), grid=[3,1], width=5)
+    minus_ph_button = ctk.CTkButton(ph_frame, text="-", command=lambda: update_ph(ph_value_text, -0.1))
+    minus_ph_button.pack(side="left", padx=5)
     
-    back_button = PushButton(setpoints_box, text="Back", command=lambda: back_to_main(setpoints_app), grid=[0,2], align="left")
+    plus_ph_button = ctk.CTkButton(ph_frame, text="+", command=lambda: update_ph(ph_value_text, 0.1))
+    plus_ph_button.pack(side="left", padx=5)
     
-    setpoints_app.display()
+    back_button = ctk.CTkButton(setpoints_app, text="Back", command=lambda: back_to_main(setpoints_app))
+    back_button.pack(pady=20)
+    
+    setpoints_app.mainloop()
 
 def update_temp(temp_text, change):
     global temp_value
     temp_value += change
-    temp_text.value = f"{temp_value:.1f}°C"
+    temp_text.configure(text=f"{temp_value:.1f}°C")
 
 def update_ph(ph_text, change):
     global ph_value
     ph_value += change
-    ph_text.value = f"{ph_value:.1f}"
+    ph_text.configure(text=f"{ph_value:.1f}")
 
 def settings_screen(main_app):
     # Function to display the settings screen
     main_app.destroy()
-    settings_app = App(title="Settings", bg="#F0F0F0", height=400, width=600)
+    settings_app = ctk.CTk()
+    settings_app.title("Settings")
+    settings_app.geometry("600x400")
     
-    header_text = Text(settings_app, text="Settings", size=24, font="Arial", color="#007bff")
+    header_text = ctk.CTkLabel(settings_app, text="Settings", font=("Arial", 36), text_color="#007bff")
+    header_text.pack(pady=20)
     
-    settings_box = Box(settings_app, border=True, width="fill", align="top")
+    settings_frame = ctk.CTkFrame(settings_app)
+    settings_frame.pack(pady=20)
     
-    language_text = Text(settings_box, text="Language:")
-    language_combo = Combo(settings_box, options=["English", "Spanish", "Chinese", "Japanese"])
+    language_text = ctk.CTkLabel(settings_frame, text="Language:")
+    language_text.pack()
     
-    font_size_text = Text(settings_box, text="Font Size:")
-    font_size_combo = Combo(settings_box, options=["Small", "Medium", "Large"])
+    language_combo = ctk.CTkOptionMenu(settings_frame, values=["English", "Spanish", "Chinese", "Japanese"])
+    language_combo.pack()
     
-    color_mode_text = Text(settings_box, text="Color Mode:")
-    color_mode_combo = Combo(settings_box, options=["Dark Mode", "Light Mode"])
+    font_size_text = ctk.CTkLabel(settings_frame, text="Font Size:")
+    font_size_text.pack()
     
-    back_button = PushButton(settings_box, text="Back", command=lambda: back_to_main(settings_app))
+    font_size_combo = ctk.CTkOptionMenu(settings_frame, values=["Small", "Medium", "Large"])
+    font_size_combo.pack()
     
-    settings_app.display()
+    color_mode_text = ctk.CTkLabel(settings_frame, text="Color Mode:")
+    color_mode_text.pack()
+    
+    color_mode_combo = ctk.CTkOptionMenu(settings_frame, values=["Dark Mode", "Light Mode"])
+    color_mode_combo.pack()
+    
+    back_button = ctk.CTkButton(settings_app, text="Back", command=lambda: back_to_main(settings_app))
+    back_button.pack(pady=20)
+    
+    settings_app.mainloop()
 
 def back_to_main(app):
     # Function to go back to the main screen
