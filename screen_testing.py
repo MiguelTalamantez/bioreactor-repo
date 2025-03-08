@@ -43,10 +43,10 @@ def stats_screen(main_app):
     header_frame = ctk.CTkFrame(stats_frame)
     header_frame.pack(fill="x")
     
-    measurement_text = ctk.CTkLabel(header_frame, text="**Measurement**", font=("Arial", 18, "bold"))
+    measurement_text = ctk.CTkLabel(header_frame, text="Measurement", font=("Arial", 18, "bold"))
     measurement_text.pack(side="left", expand=True)
     
-    value_text = ctk.CTkLabel(header_frame, text="**Value**", font=("Arial", 18, "bold"))
+    value_text = ctk.CTkLabel(header_frame, text="Value", font=("Arial", 18, "bold"))
     value_text.pack(side="left", expand=True)
     
     # Temperature Row
