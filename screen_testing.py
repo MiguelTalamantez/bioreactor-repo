@@ -123,7 +123,6 @@ class StatsFrame(ctk.CTkFrame):
             command=lambda: parent.show_frame(MainFrame)  # Navigate back to the main frame
         ).pack(pady=20)
 
-
 class SetpointsFrame(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent)
@@ -131,6 +130,9 @@ class SetpointsFrame(ctk.CTkFrame):
         # Initialize default setpoint values
         self.temp_value = 25.0  # Default temperature value in °C
         self.ph_value = 7.0     # Default pH value
+
+        # Store labels for each parameter
+        self.labels = {}
 
         # Header Section
         header_text = ctk.CTkLabel(
@@ -181,10 +183,13 @@ class SetpointsFrame(ctk.CTkFrame):
         )
 
         # Label to display the current value with its unit
-        self.value_label = ctk.CTkLabel(
+        value_label = ctk.CTkLabel(
             frame, text=f"{value}{unit}", font=("Arial", 14)
         )
-        self.value_label.grid(row=row, column=1, padx=10, pady=10)
+        value_label.grid(row=row, column=1, padx=10, pady=10)
+
+        # Store the label reference for later updates
+        self.labels[label] = value_label
 
         # Decrement button (-)
         ctk.CTkButton(
@@ -203,24 +208,26 @@ class SetpointsFrame(ctk.CTkFrame):
     def update_temp(self, change):
         """
         Updates the temperature value and refreshes its display.
+
         Parameters:
             change (float): The amount to adjust the temperature by.
                            Positive for increment; negative for decrement.
         """
         
         self.temp_value += change
-        self.value_label.configure(text=f"{self.temp_value:.1f}°C")
+        self.labels["Temperature"].configure(text=f"{self.temp_value:.1f}°C")
 
     def update_ph(self, change):
         """
         Updates the pH value and refreshes its display.
+
         Parameters:
             change (float): The amount to adjust the pH by.
                            Positive for increment; negative for decrement.
         """
         
         self.ph_value += change
-        self.value_label.configure(text=f"{self.ph_value:.1f}")
+        self.labels["pH"].configure(text=f"{self.ph_value:.1f}")
 
 class SettingsFrame(ctk.CTkFrame):
     def __init__(self, parent):
@@ -234,13 +241,15 @@ class SettingsFrame(ctk.CTkFrame):
         settings_frame = ctk.CTkFrame(self)
         settings_frame.pack(pady=20)
         
-        # Font Size Option
-        ctk.CTkLabel(settings_frame, text="Font Size:").pack()
-        ctk.CTkOptionMenu(settings_frame, values=["Small", "Medium", "Large"]).pack()
+        ctk.CTkLabel(settings_frame, text="edit the code lol").pack()
         
-        # Color Mode Option
-        ctk.CTkLabel(settings_frame, text="Color Mode:").pack()
-        ctk.CTkOptionMenu(settings_frame, values=["Dark Mode", "Light Mode"]).pack()
+        # # Font Size Option
+        # ctk.CTkLabel(settings_frame, text="Font Size:").pack()
+        # ctk.CTkOptionMenu(settings_frame, values=["Small", "Medium", "Large"]).pack()
+        
+        # # Color Mode Option
+        # ctk.CTkLabel(settings_frame, text="Color Mode:").pack()
+        # ctk.CTkOptionMenu(settings_frame, values=["Dark Mode", "Light Mode"]).pack()
         
         # Back Button
         ctk.CTkButton(self, text="Back", command=lambda: parent.show_frame(MainFrame)).pack(pady=20)
