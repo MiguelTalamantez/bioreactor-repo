@@ -3,26 +3,38 @@ import customtkinter as ctk
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
+
+        # Application Title and Window Configuration
         self.title("NIMBLE")
-        window_width=600
-        window_height=400
-        screen_width=self.winfo_screenwidth()
-        screen_height=self.winfo_screenheight()
-        center_x=int((screen_width/2)-(window_width/2))
-        center_y=int((screen_height/2)-(window_height/2))
+        window_width = 600
+        window_height = 400
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        center_x = int((screen_width / 2) - (window_width / 2))
+        center_y = int((screen_height / 2) - (window_height / 2))
         self.geometry(f"{window_width}x{window_height}+{center_x}+{center_y}")
-        self.resizable(False,False)
+        self.resizable(False, False)
         ctk.set_appearance_mode("System")
         ctk.set_default_color_theme("blue")
-        self.frames={}
-        for F in (MainFrame,StatsFrame,SetpointsFrame,SettingsFrame):
-            frame=F(self)
-            self.frames[F]=frame
-            frame.grid(row=0,column=0,sticky="nsew")
+
+        # Shared Variables Section
+            # These variables hold the values displayed on the stats page.
+        self.temperature = 25.0  # Temperature in °C
+        self.ph = 7.0            # pH value
+        self.dissolved_oxygen = 5.0  # Dissolved oxygen in mg/L
+        self.optical_density = 0.5   # Optical density (unitless)
+
+        # Frame Management
+        self.frames = {}
+        for F in (MainFrame, StatsFrame, SetpointsFrame, SettingsFrame):
+            frame = F(self)
+            self.frames[F] = frame
+            frame.grid(row=0, column=0, sticky="nsew")
         self.show_frame(MainFrame)
     
-    def show_frame(self,cont):
-        frame=self.frames[cont]
+    def show_frame(self, cont):
+        """Raise the specified frame to the top."""
+        frame = self.frames[cont]
         frame.tkraise()
 
 class MainFrame(ctk.CTkFrame):
@@ -80,32 +92,37 @@ class StatsFrame(ctk.CTkFrame):
         ctk.CTkLabel(
             stats_frame, text="Measurement", font=("Arial", 18, "bold")
         ).grid(row=0, column=0, padx=10, pady=5, sticky="ew")
+        
         ctk.CTkLabel(
             stats_frame, text="Value", font=("Arial", 18, "bold")
         ).grid(row=0, column=1, padx=10, pady=5, sticky="ew")
 
-        # Measurement Data
-        measurements = ["Temperature", "pH", "Optical Density", "Dissolved Oxygen"]  # List of measurement names
-        values = ["25°C", "7.0", "0.5", "5.0 mg/L"]  # Corresponding values for each measurement
+        # Measurement Data (Linked to Shared Variables)
+        measurements = ["Temperature", "pH", "Optical Density", "Dissolved Oxygen"]
+        
+        values = [
+            f"{parent.temperature:.1f}°C",
+            f"{parent.ph:.1f}",
+            f"{parent.optical_density:.1f}",
+            f"{parent.dissolved_oxygen:.1f} mg/L"
+        ]
 
-        # Populate the table with measurements and their values
         for i in range(len(measurements)):
-            # Add measurement label to the first column
             ctk.CTkLabel(
                 stats_frame, text=measurements[i], font=("Arial", 14)
             ).grid(row=i + 1, column=0, padx=10, pady=5, sticky="ew")
 
-            # Add corresponding value to the second column
             ctk.CTkLabel(
                 stats_frame, text=values[i], font=("Arial", 14)
             ).grid(row=i + 1, column=1, padx=10, pady=5, sticky="ew")
 
-        # Back Button Section
+        # Back Button
         ctk.CTkButton(
             self,
             text="Back",
             command=lambda: parent.show_frame(MainFrame)  # Navigate back to the main frame
         ).pack(pady=20)
+
 
 class SetpointsFrame(ctk.CTkFrame):
     def __init__(self, parent):
