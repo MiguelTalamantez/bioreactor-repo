@@ -29,7 +29,7 @@ class App(ctk.CTk):
         self.is_paused = False
         self.remaining_time = 0  # In seconds
         self.total_duration = 0  # In seconds
-        self.run_duration = 24   # Default duration in hours
+        self.run_duration = 24 * 60  # Default duration in minutes (24 hours)
         self.after_id = None
         
         # Process Variables
@@ -63,7 +63,7 @@ class App(ctk.CTk):
     def start_run(self):
         self.is_running = True
         self.is_paused = False
-        self.total_duration = self.run_duration * 3600
+        self.total_duration = self.run_duration * 60  # Convert minutes to seconds
         self.remaining_time = self.total_duration
         self._update_timer()
         self.frames[MainFrame].update_buttons()
@@ -96,9 +96,7 @@ class App(ctk.CTk):
                 self.time_remaining_str.set(self._format_time(self.remaining_time))
                 self.after_id = self.after(1000, self._update_timer)
             else:
-                self.is_running = False
-                self.time_remaining_str.set("00:00:00")
-        self.frames[MainFrame].update_buttons()
+                self.stop_run()
     
     def _format_time(self, seconds):
         hours = seconds // 3600
@@ -248,8 +246,8 @@ class SetpointsFrame(ctk.CTkFrame):
         super().__init__(parent)
         
         # Initialize default values
-        self.run_duration_value = 24  # Add this line to initialize duration
-        self.temp_value = 25.0
+        self.run_duration_value = 24 * 60  # Default duration in minutes (24 hours)
+        self.temperature_value = 25.0  # Corrected attribute name
         self.ph_value = 7.0
         self.labels = {}
 
@@ -271,7 +269,7 @@ class SetpointsFrame(ctk.CTkFrame):
             control_frame.grid_columnconfigure(col, weight=1, uniform="column")
         
         # Add parameter rows
-        self._create_parameter_row(control_frame, "Run Duration", 0, "hours", self.update_duration)
+        self._create_duration_row(control_frame, 0)
         self._create_parameter_row(control_frame, "Temperature", 1, "°C", self.update_temp)
         self._create_parameter_row(control_frame, "pH", 2, "", self.update_ph)
         
@@ -282,16 +280,53 @@ class SetpointsFrame(ctk.CTkFrame):
             command=lambda: self.master.show_frame(MainFrame)
         ).pack(pady=20)
     
+    def _create_duration_row(self, frame, row):
+        label = "Run Duration"
+        ctk.CTkLabel(frame, text=label, font=("Arial", 14)).grid(row=row, column=0, padx=10, pady=10, sticky="w")
+        
+        # Initial value display
+        hours = self.run_duration_value // 60
+        minutes = self.run_duration_value % 60
+        value_label = ctk.CTkLabel(
+            frame, 
+            text=f"{hours}h {minutes}m",
+            font=("Arial", 14)
+        )
+        value_label.grid(row=row, column=1, padx=10, pady=10)
+        self.labels[label] = value_label
+        
+        # Button container frame
+        button_frame = ctk.CTkFrame(frame)
+        button_frame.grid(row=row, column=2, columnspan=2, sticky="ew")
+        
+        # Duration control buttons
+        buttons = [
+            ("-1m", -1),
+            ("+1m", 1),
+            ("-30m", -30),
+            ("+30m", 30)
+        ]
+        
+        for text, delta in buttons:
+            ctk.CTkButton(
+                button_frame,
+                text=text,
+                width=60,
+                command=lambda d=delta: self._adjust_duration(d)
+            ).pack(side="left", padx=2)
+    
+    def _adjust_duration(self, delta):
+        new_value = max(0, self.run_duration_value + delta)
+        self.run_duration_value = new_value
+        hours = new_value // 60
+        minutes = new_value % 60
+        self.labels["Run Duration"].configure(text=f"{hours}h {minutes}m")
+        self.master.run_duration = new_value
+    
     def _create_parameter_row(self, frame, label, row, unit, callback):
         ctk.CTkLabel(frame, text=label, font=("Arial", 14)).grid(row=row, column=0, padx=10, pady=10, sticky="w")
         
-        # Get the correct value based on parameter type
-        value = getattr(self, {
-            "Run Duration": "run_duration_value",
-            "Temperature": "temp_value",
-            "pH": "ph_value"
-        }[label])
-        
+        value = getattr(self, f"{label.lower()}_value")
         value_label = ctk.CTkLabel(
             frame, 
             text=f"{value}{unit}",
@@ -303,30 +338,23 @@ class SetpointsFrame(ctk.CTkFrame):
         ctk.CTkButton(
             frame,
             text="-",
-            command=lambda: self._adjust_value(label, -1 if label == "Run Duration" else -0.5, callback)
+            font=("Arial", 18),
+            command=lambda: self._adjust_value(label, -0.5 if label == "Temperature" else -0.1, callback)
         ).grid(row=row, column=2, padx=5, pady=10)
         
         ctk.CTkButton(
             frame,
             text="+",
-            command=lambda: self._adjust_value(label, 1 if label == "Run Duration" else 0.5, callback)
+            command=lambda: self._adjust_value(label, 0.5 if label == "Temperature" else 0.1, callback)
         ).grid(row=row, column=3, padx=5, pady=10)
     
     def _adjust_value(self, label, amount, callback):
-        attr_name = {
-            "Run Duration": "run_duration_value",
-            "Temperature": "temp_value",
-            "pH": "ph_value"
-        }[label]
-        
+        attr_name = f"{label.lower()}_value"
         current_value = getattr(self, attr_name)
         new_value = max(0, current_value + amount)
         setattr(self, attr_name, new_value)
-        self.labels[label].configure(text=f"{new_value:.1f}{' hours' if label == 'Run Duration' else ''}")
+        self.labels[label].configure(text=f"{new_value:.1f}{'°C' if label == 'Temperature' else ''}")
         callback(new_value)
-    
-    def update_duration(self, value):
-        self.master.run_duration = value
     
     def update_temp(self, value):
         self.master.temperature = value
