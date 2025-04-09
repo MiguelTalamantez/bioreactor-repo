@@ -26,9 +26,11 @@ class App(ctk.CTk):
     def _initialize_variables(self):
         # Bioreactor State Variables
         self.is_running = False
+        self.is_paused = False
         self.remaining_time = 0  # In seconds
         self.total_duration = 0  # In seconds
         self.run_duration = 24   # Default duration in hours
+        self.after_id = None
         
         # Process Variables
         self.temperature = 25.0
@@ -53,23 +55,50 @@ class App(ctk.CTk):
         frame.tkraise()
     
     def toggle_run(self):
-        self.is_running = not self.is_running
-        if self.is_running:
-            self.total_duration = self.run_duration * 3600
-            self.remaining_time = self.total_duration
-            self._update_timer()
-        self.frames[MainFrame].run_button.configure(
-            text="Stop Run" if self.is_running else "Start Run"
-        )
+        if not self.is_running:
+            self.start_run()
+        else:
+            self.pause_run()
+    
+    def start_run(self):
+        self.is_running = True
+        self.is_paused = False
+        self.total_duration = self.run_duration * 3600
+        self.remaining_time = self.total_duration
+        self._update_timer()
+        self.frames[MainFrame].update_buttons()
+    
+    def pause_run(self):
+        self.is_paused = True
+        if self.after_id:
+            self.after_cancel(self.after_id)
+            self.after_id = None
+        self.frames[MainFrame].update_buttons()
+    
+    def resume_run(self):
+        self.is_paused = False
+        self._update_timer()
+        self.frames[MainFrame].update_buttons()
+    
+    def stop_run(self):
+        self.is_running = False
+        self.is_paused = False
+        if self.after_id:
+            self.after_cancel(self.after_id)
+            self.after_id = None
+        self.time_remaining_str.set("00:00:00")
+        self.frames[MainFrame].update_buttons()
     
     def _update_timer(self):
-        if self.is_running and self.remaining_time > 0:
-            self.remaining_time -= 1
-            self.time_remaining_str.set(self._format_time(self.remaining_time))
-            self.after(1000, self._update_timer)
-        else:
-            self.is_running = False
-            self.time_remaining_str.set("00:00:00")
+        if self.is_running and not self.is_paused:
+            if self.remaining_time > 0:
+                self.remaining_time -= 1
+                self.time_remaining_str.set(self._format_time(self.remaining_time))
+                self.after_id = self.after(1000, self._update_timer)
+            else:
+                self.is_running = False
+                self.time_remaining_str.set("00:00:00")
+        self.frames[MainFrame].update_buttons()
     
     def _format_time(self, seconds):
         hours = seconds // 3600
@@ -84,6 +113,7 @@ class App(ctk.CTk):
 class MainFrame(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent)
+        self.parent = parent
         
         # Header
         header_text = ctk.CTkLabel(
@@ -98,18 +128,39 @@ class MainFrame(ctk.CTkFrame):
         self.run_control_frame = ctk.CTkFrame(self)
         self.run_control_frame.pack(pady=20)
         
-        self.run_button = ctk.CTkButton(
+        # Control Buttons
+        self.start_button = ctk.CTkButton(
             self.run_control_frame,
             text="Start Run",
-            command=parent.toggle_run
+            command=self.parent.toggle_run
         )
-        self.run_button.pack(side="left", padx=10)
+        
+        self.pause_button = ctk.CTkButton(
+            self.run_control_frame,
+            text="Pause",
+            command=self.parent.pause_run
+        )
+        
+        self.resume_button = ctk.CTkButton(
+            self.run_control_frame,
+            text="Resume",
+            command=self.parent.resume_run
+        )
+        
+        self.stop_button = ctk.CTkButton(
+            self.run_control_frame,
+            text="Stop",
+            command=self.parent.stop_run
+        )
         
         self.time_label = ctk.CTkLabel(
             self.run_control_frame,
-            textvariable=parent.time_remaining_str,
+            textvariable=self.parent.time_remaining_str,
             font=("Arial", 14)
         )
+        
+        # Initial layout
+        self.start_button.pack(side="left", padx=10)
         self.time_label.pack(side="left", padx=10)
         
         # Navigation Buttons
@@ -126,8 +177,25 @@ class MainFrame(ctk.CTkFrame):
             ctk.CTkButton(
                 options_frame,
                 text=text,
-                command=lambda fc=frame_class: parent.show_frame(fc)
+                command=lambda fc=frame_class: self.parent.show_frame(fc)
             ).pack(side="left", padx=10)
+    
+    def update_buttons(self):
+        # Clear existing buttons
+        for btn in [self.start_button, self.pause_button, 
+                   self.resume_button, self.stop_button]:
+            btn.pack_forget()
+        
+        # Show appropriate buttons
+        if not self.parent.is_running:
+            self.start_button.pack(side="left", padx=10)
+        elif self.parent.is_running and not self.parent.is_paused:
+            self.pause_button.pack(side="left", padx=10)
+        else:  # Paused state
+            self.resume_button.pack(side="left", padx=10)
+            self.stop_button.pack(side="left", padx=10)
+            
+        self.time_label.pack(side="left", padx=10)
 
 class StatsFrame(ctk.CTkFrame):
     def __init__(self, parent):
@@ -266,7 +334,6 @@ class SetpointsFrame(ctk.CTkFrame):
     def update_ph(self, value):
         self.master.ph = value
 
-
 class SettingsFrame(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent)
@@ -279,17 +346,8 @@ class SettingsFrame(ctk.CTkFrame):
         settings_frame = ctk.CTkFrame(self)
         settings_frame.pack(pady=20)
         
+        # Preserve existing commented code
         ctk.CTkLabel(settings_frame, text="edit the code lol").pack()
-        
-        # # Theme Setting
-        # ctk.CTkLabel(settings_frame, text="Color Mode:").pack()
-        # self.theme_selector = ctk.CTkOptionMenu(
-        #     settings_frame,
-        #     values=["Dark Mode", "Light Mode"],
-        #     command=lambda choice: parent.update_theme("Dark" if "Dark" in choice else "Light")
-        # )
-        # self.theme_selector.set("Dark Mode" if parent.appearance_mode == "Dark" else "Light Mode")
-        # self.theme_selector.pack()
         
         # Back Button
         ctk.CTkButton(
