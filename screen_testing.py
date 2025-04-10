@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import tkinter as tk
 import time
 
 class App(ctk.CTk):
@@ -21,6 +22,10 @@ class App(ctk.CTk):
         center_y = int((screen_height / 2) - (window_height / 2))
         self.geometry(f"{window_width}x{window_height}+{center_x}+{center_y}")
         self.resizable(False, False)
+        
+        # Set background color to white
+        self.configure(bg="white")
+        
         ctk.set_appearance_mode("System")
         ctk.set_default_color_theme("blue")
         
@@ -67,20 +72,20 @@ class App(ctk.CTk):
         self.total_duration = self.run_duration * 60  # Convert minutes to seconds
         self.remaining_time = self.total_duration
         self._update_timer()
-        self.frames[MainFrame].update_buttons()
-    
+        self.frames[MainFrame].update_buttons()  # Update buttons
+
     def pause_run(self):
         self.is_paused = True
         if self.after_id:
             self.after_cancel(self.after_id)
             self.after_id = None
-        self.frames[MainFrame].update_buttons()
-    
+        self.frames[MainFrame].update_buttons()  # Update buttons
+
     def resume_run(self):
         self.is_paused = False
         self._update_timer()
-        self.frames[MainFrame].update_buttons()
-    
+        self.frames[MainFrame].update_buttons()  # Update buttons
+
     def stop_run(self):
         self.is_running = False
         self.is_paused = False
@@ -88,7 +93,7 @@ class App(ctk.CTk):
             self.after_cancel(self.after_id)
             self.after_id = None
         self.time_remaining_str.set("00:00:00")
-        self.frames[MainFrame].update_buttons()
+        self.frames[MainFrame].update_buttons()  # Update buttons
     
     def _update_timer(self):
         if self.is_running and not self.is_paused:
@@ -111,126 +116,136 @@ class App(ctk.CTk):
 
 class MainFrame(ctk.CTkFrame):
     def __init__(self, parent):
-        super().__init__(parent)
+        super().__init__(parent, fg_color="white")  # Set frame background color to white
         self.parent = parent
 
-        # Header Section
-        header_text = ctk.CTkLabel(
-            self, 
-            text="NIMBLE",
-            font=("Arial", 12),
-            text_color="#007bff"
-        )
-        header_text.pack(pady=5)
+        # Load and display the image at the top of the screen
+        logo_image = tk.PhotoImage(file="logo2.png")  # Load the image file
+        logo_label = ctk.CTkLabel(self, image=logo_image, text="", fg_color="white")  # Ensure label background matches
+        logo_label.image = logo_image  # Keep a reference to avoid garbage collection
+        logo_label.pack(pady=(10, 0))  # Add padding to separate it from other elements
 
         # Run Control Section
-        self.run_control_frame = ctk.CTkFrame(self)
+        self.run_control_frame = ctk.CTkFrame(self, fg_color="white")  # Set frame background color to white
         self.run_control_frame.pack(pady=10)
 
-        # Control Buttons
+        # Control Buttons (Enlarged)
         self.start_button = ctk.CTkButton(
             self.run_control_frame,
             text="Start",
             width=120,
+            height=50,  # Increased button height for better usability
             command=self.parent.toggle_run
         )
         self.pause_button = ctk.CTkButton(
             self.run_control_frame,
             text="Pause",
             width=120,
+            height=50,
             command=self.parent.pause_run
         )
         self.resume_button = ctk.CTkButton(
             self.run_control_frame,
             text="Resume",
             width=120,
+            height=50,
             command=self.parent.resume_run
         )
         self.stop_button = ctk.CTkButton(
             self.run_control_frame,
             text="Stop",
             width=120,
+            height=50,
             command=self.parent.stop_run
         )
 
         self.time_label = ctk.CTkLabel(
             self.run_control_frame,
             textvariable=self.parent.time_remaining_str,
-            font=("Arial", 12)
+            font=("Calibri Light", 36)  # Font size remains readable
         )
+        
+        self.reaction_name_label = ctk.CTkLabel(
+            self.run_control_frame,
+            text="Reaction Name: Yeast Fermentation",
+            font=("Calibri Light", 22),  # Adjust font size as needed
+            fg_color="white",  # Match the background color
+            text_color="black"  # Set text color to black for visibility
+        )
+        self.reaction_name_label.pack(pady=(0, 5))  # Add padding below the label
 
-        # Initial button layout
-        self.start_button.pack(side="left", padx=5)
-        self.time_label.pack(side="left", padx=5)
+
+        # Arrange buttons horizontally
+        # self.start_button.pack(side="left", padx=10)
+        # self.pause_button.pack(side="left", padx=10)
+        # self.resume_button.pack(side="left", padx=10)
+        # self.stop_button.pack(side="left", padx=10)
+        # self.time_label.pack(side="left", padx=10)
 
         # Navigation Buttons Frame
         options_frame = ctk.CTkFrame(self)
-        options_frame.pack(pady=20)
-        
-        # Buttons
+        options_frame.pack(pady=5)
+
         buttons = [
             ("Set Control Parameters", SetpointsFrame),
             ("Settings", SettingsFrame)
         ]
-        
+
         for text, frame_class in buttons:
             ctk.CTkButton(
                 options_frame,
                 text=text,
-                width=200,
-                height = 40,
+                width=140,  # Increased button width for navigation buttons
+                height=40,  # Increased button height for navigation buttons
                 command=lambda fc=frame_class: self.parent.show_frame(fc)
             ).pack(side="left", padx=5)
 
-        # Stats Table Section
-        stats_header = ctk.CTkLabel(
-            self, 
-            text="Bioreactor Status",
-            font=("Arial", 18),
-            text_color="#007bff"
-        )
-        stats_header.pack(pady=15)
-
         stats_frame = ctk.CTkFrame(self)
-        stats_frame.pack(pady=0, fill="both", expand=True)
+        stats_frame.pack(pady=5, fill="both", expand=True)
 
-        # Configure grid layout
+        # Configure grid layout for two columns
         stats_frame.grid_columnconfigure(0, weight=1)
         stats_frame.grid_columnconfigure(1, weight=1)
 
-        # Table Headers
-        # ctk.CTkLabel(stats_frame, text="Measurement", font=("Arial", 16, "bold")).grid(row=0, column=0, padx=5, pady=3)
-        # ctk.CTkLabel(stats_frame, text="Value", font=("Arial", 16, "bold")).grid(row=0, column=1, padx=5, pady=3)
+        # Table Headers (Increased Font Size)
+        ctk.CTkLabel(stats_frame, text="Measurement", font=("Calibri Light", 16, "bold")).grid(row=0, column=0, padx=5, pady=3)
+        ctk.CTkLabel(stats_frame, text="Value", font=("Calibri Light", 16, "bold")).grid(row=0, column=1, padx=5, pady=3)
 
-        # Measurement Data
+        # Measurement Data (Increased Font Size)
         measurements = [
             ("Temperature", f"{self.parent.temperature:.1f}°C"),
             ("pH", f"{self.parent.ph:.1f}"),
             ("Optical Density", f"{self.parent.optical_density:.1f}"),
             ("Dissolved Oxygen", f"{self.parent.dissolved_oxygen:.1f} mg/L")
         ]
-        
-        for idx, (measurement, value) in enumerate(measurements, 1):
-            ctk.CTkLabel(stats_frame, text=measurement, font=("Arial", 14)).grid(row=idx, column=0, padx=5, pady=3)
-            ctk.CTkLabel(stats_frame, text=value, font=("Arial", 14)).grid(row=idx, column=1, padx=5, pady=3)
 
+        for idx, (measurement, value) in enumerate(measurements, 1):
+            ctk.CTkLabel(stats_frame, text=measurement, font=("Calibri Light", 14)).grid(row=idx, column=0, padx=5, pady=3)
+            ctk.CTkLabel(stats_frame, text=value, font=("Calibri Light", 14)).grid(row=idx, column=1, padx=5, pady=3)
+        
+        # Call update_buttons to ensure only Start is visible initially
+        self.update_buttons()
+        
     def update_buttons(self):
         # Clear existing buttons
-        for btn in [self.start_button, self.pause_button,
-                    self.resume_button, self.stop_button]:
+        for btn in [self.start_button, self.pause_button, self.resume_button, self.stop_button]:
             btn.pack_forget()
 
-        # Update button visibility based on state
+        # Show appropriate buttons based on state
         if not self.parent.is_running:
-            self.start_button.pack(side="left", padx=5)
+            # Show Start button if not running
+            self.start_button.pack(side="left", padx=10)
         elif self.parent.is_paused:
-            self.resume_button.pack(side="left", padx=5)
-            self.stop_button.pack(side="left", padx=5)
+            # Show Resume and Stop buttons if paused
+            self.resume_button.pack(side="left", padx=10)
+            self.stop_button.pack(side="left", padx=10)
         else:
-            self.pause_button.pack(side="left", padx=5)
-            self.stop_button.pack(side="left", padx=5)
-            
-        self.time_label.pack(side="left", padx=5)
+            # Show Pause and Stop buttons if running
+            self.pause_button.pack(side="left", padx=10)
+            self.stop_button.pack(side="left", padx=10)
+
+        # Always show the time label
+        self.time_label.pack(side="left", padx=10)
 
 
 
@@ -240,7 +255,7 @@ class StatsFrame(ctk.CTkFrame):
 
         # Header Section
         header_text = ctk.CTkLabel(
-            self, text="Bioreactor Status", font=("Arial", 36), text_color="#007bff"
+            self, text="Bioreactor Status", font=("Calibri Light", 36), text_color="#007bff"
         )
         header_text.pack(pady=20)
 
@@ -254,11 +269,11 @@ class StatsFrame(ctk.CTkFrame):
 
         # Table Header Row
         ctk.CTkLabel(
-            stats_frame, text="Measurement", font=("Arial", 18, "bold")
+            stats_frame, text="Measurement", font=("Calibri Light", 18, "bold")
         ).grid(row=0, column=0, padx=10, pady=5, sticky="ew")
         
         ctk.CTkLabel(
-            stats_frame, text="Value", font=("Arial", 18, "bold")
+            stats_frame, text="Value", font=("Calibri Light", 18, "bold")
         ).grid(row=0, column=1, padx=10, pady=5, sticky="ew")
 
         # Measurement Data
@@ -270,8 +285,8 @@ class StatsFrame(ctk.CTkFrame):
         ]
         
         for idx, (measurement, value) in enumerate(measurements, 1):
-            ctk.CTkLabel(stats_frame, text=measurement, font=("Arial", 14)).grid(row=idx, column=0, padx=10, pady=5, sticky="ew")
-            ctk.CTkLabel(stats_frame, text=value, font=("Arial", 14)).grid(row=idx, column=1, padx=10, pady=5, sticky="ew")
+            ctk.CTkLabel(stats_frame, text=measurement, font=("Calibri Light", 14)).grid(row=idx, column=0, padx=10, pady=5, sticky="ew")
+            ctk.CTkLabel(stats_frame, text=value, font=("Calibri Light", 14)).grid(row=idx, column=1, padx=10, pady=5, sticky="ew")
         
         # Back Button
         ctk.CTkButton(
@@ -294,7 +309,7 @@ class SetpointsFrame(ctk.CTkFrame):
         header_text = ctk.CTkLabel(
             self,
             text="Control Parameters",
-            font=("Arial", 36),
+            font=("Calibri Light", 36),
             text_color="#007bff"
         )
         header_text.pack(pady=20)
@@ -321,7 +336,7 @@ class SetpointsFrame(ctk.CTkFrame):
     
     def _create_duration_row(self, frame, row):
         label = "Run Duration"
-        ctk.CTkLabel(frame, text=label, font=("Arial", 14)).grid(row=row, column=0, padx=10, pady=10, sticky="w")
+        ctk.CTkLabel(frame, text=label, font=("Calibri Light", 14)).grid(row=row, column=0, padx=10, pady=10, sticky="w")
         
         # Initial value display
         hours = self.run_duration_value // 60
@@ -329,7 +344,7 @@ class SetpointsFrame(ctk.CTkFrame):
         value_label = ctk.CTkLabel(
             frame, 
             text=f"{hours}h {minutes}m",
-            font=("Arial", 14)
+            font=("Calibri Light", 14)
         )
         value_label.grid(row=row, column=1, padx=10, pady=10)
         self.labels[label] = value_label
@@ -363,13 +378,13 @@ class SetpointsFrame(ctk.CTkFrame):
         self.master.run_duration = new_value
     
     def _create_parameter_row(self, frame, label, row, unit, callback):
-        ctk.CTkLabel(frame, text=label, font=("Arial", 14)).grid(row=row, column=0, padx=10, pady=10, sticky="w")
+        ctk.CTkLabel(frame, text=label, font=("Calibri Light", 14)).grid(row=row, column=0, padx=10, pady=10, sticky="w")
         
         value = getattr(self, f"{label.lower()}_value")
         value_label = ctk.CTkLabel(
             frame, 
             text=f"{value}{unit}",
-            font=("Arial", 14)
+            font=("Calibri Light", 14)
         )
         value_label.grid(row=row, column=1, padx=10, pady=10)
         self.labels[label] = value_label
@@ -377,7 +392,7 @@ class SetpointsFrame(ctk.CTkFrame):
         ctk.CTkButton(
             frame,
             text="-",
-            font=("Arial", 18),
+            font=("Calibri Light", 18),
             command=lambda: self._adjust_value(label, -0.5 if label == "Temperature" else -0.1, callback)
         ).grid(row=row, column=2, padx=5, pady=10)
         
@@ -406,7 +421,7 @@ class SettingsFrame(ctk.CTkFrame):
         super().__init__(parent)
         
         # Header
-        header_text = ctk.CTkLabel(self, text="Settings", font=("Arial", 36), text_color="#007bff")
+        header_text = ctk.CTkLabel(self, text="Settings", font=("Calibri Light", 36), text_color="#007bff")
         header_text.pack(pady=20)
         
         # Settings Frame
