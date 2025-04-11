@@ -120,7 +120,7 @@ class MainFrame(ctk.CTkFrame):
         self.parent = parent
 
         # Load and display the image at the top of the screen
-        logo_image = tk.PhotoImage(file="logo2.png")  # Load the image file
+        logo_image = tk.PhotoImage(file="V1/logo2.png")  # Load the image file
         logo_label = ctk.CTkLabel(self, image=logo_image, text="", fg_color="white")  # Ensure label background matches
         logo_label.image = logo_image  # Keep a reference to avoid garbage collection
         logo_label.pack(pady=(10, 0))  # Add padding to separate it from other elements
@@ -413,7 +413,7 @@ class SetpointsFrame(ctk.CTkFrame):
     def update_temp(self, value):
         self.master.temperature = value
     
-    def update_ph(self, value):
+    def update_ph(self, value): 
         self.master.ph = value
 
 class SettingsFrame(ctk.CTkFrame):
