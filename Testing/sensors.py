@@ -15,4 +15,4 @@ chan = AnalogIn(ads, ADS.P0)
 # Continuously print the values
 while True:
     print(f"MQ-135 Voltage: {chan.voltage}V")
-    time.sleep(1)
+    time.sleep(0.2)
