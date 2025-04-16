@@ -21,12 +21,20 @@ class Oscilloscope:
     def __init__(self, master):
         self.master = master
         self.master.title("Raspberry Pi Oscilloscope")
-        
+
+        # Voltage label
+        self.voltage_var = tk.StringVar()
+        self.voltage_var.set("Voltage: -- V")
+        self.voltage_label = tk.Label(
+            master, textvariable=self.voltage_var, font=("Arial", 24), fg="blue"
+        )
+        self.voltage_label.pack(pady=10)
+
         # Initialize data buffers
         self.x_data = deque(maxlen=MAX_DATA_POINTS)
         self.y_data = deque(maxlen=MAX_DATA_POINTS)
         self.time_offset = time.monotonic()
-        
+
         # Create figure and axis
         self.fig = Figure(figsize=(5, 3), dpi=100)
         self.ax = self.fig.add_subplot(111)
@@ -34,16 +42,16 @@ class Oscilloscope:
         self.ax.set_xlim(0, 10)   # Initial 10-second window
         self.ax.grid(True)
         self.line, = self.ax.plot([], [], 'b-')
-        
+
         # Set up labels
         self.ax.set_xlabel('Time (s)')
         self.ax.set_ylabel('Voltage (V)')
         self.ax.set_title('Real-time ADC Measurement')
-        
+
         # Create Tkinter canvas
         self.canvas = FigureCanvasTkAgg(self.fig, master=master)
         self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-        
+
         # Start updates
         self.update_plot()
 
@@ -51,21 +59,24 @@ class Oscilloscope:
         # Read ADC value
         voltage = chan.voltage
         current_time = time.monotonic() - self.time_offset
-        
+
+        # Update voltage label
+        self.voltage_var.set(f"Voltage: {voltage:.3f} V")
+
         # Update data buffers
         self.x_data.append(current_time)
         self.y_data.append(voltage)
-        
+
         # Update plot data
         self.line.set_data(self.x_data, self.y_data)
-        
+
         # Adjust x-axis limits for scrolling effect
         if current_time > self.ax.get_xlim()[1]:
             self.ax.set_xlim(current_time - 10, current_time)
-        
+
         # Redraw the canvas
         self.canvas.draw()
-        
+
         # Schedule next update
         self.master.after(update_interval, self.update_plot)
 
