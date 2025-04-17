@@ -1,5 +1,6 @@
 import customtkinter as ctk
 import tkinter as tk
+from datetime import timedelta
 
 # --- Color Palette ---
 HEADER_COLOR = "#B0C4DE"
@@ -31,12 +32,22 @@ class App(ctk.CTk):
             "Pump 3": "Media",
             "Pump 4": "Waste"
         }
+        self.auto_shutoff_enabled = False
+        self.auto_shutoff_time = 60  # default 60 minutes
+        self.process_name = "Default Process"
+        self.process_active = False
+        self.remaining_time = 0
+        self.timer_id = None
+
         self._create_navigation()
         self._create_frames()
 
     def _create_navigation(self):
         nav_frame = ctk.CTkFrame(self, width=150, fg_color=BG_MED)
         nav_frame.pack(side="left", fill="y", ipadx=5)
+
+        button_container = ctk.CTkFrame(nav_frame, fg_color="transparent")
+        button_container.pack(expand=True)
 
         buttons = [
             ("pH", "pHFrame"),
@@ -49,7 +60,7 @@ class App(ctk.CTk):
 
         for text, frame_name in buttons:
             ctk.CTkButton(
-                nav_frame,
+                button_container,
                 text=text,
                 command=lambda name=frame_name: self.show_frame(name),
                 height=70,
@@ -79,6 +90,41 @@ class App(ctk.CTk):
             self.current_frame = frame_name
         frame = self.frames[frame_name]
         frame.tkraise()
+        # Update process controls on page switch
+        if hasattr(frame, "update_process_controls"):
+            frame.update_process_controls()
+
+    def start_process(self):
+        if not self.process_active:
+            self.process_active = True
+            self.remaining_time = self.auto_shutoff_time * 60  # Convert minutes to seconds
+            self._tick_timer()
+            self._update_all_process_controls()
+            print(f"Process '{self.process_name}' started")
+
+    def stop_process(self):
+        if self.process_active:
+            self.process_active = False
+            if self.timer_id:
+                self.after_cancel(self.timer_id)
+                self.timer_id = None
+            self._update_all_process_controls()
+            print(f"Process '{self.process_name}' stopped")
+
+    def _tick_timer(self):
+        if self.process_active and self.remaining_time > 0:
+            self.remaining_time -= 1
+            self._update_all_process_controls()
+            self.timer_id = self.after(1000, self._tick_timer)
+        else:
+            if self.process_active:
+                self.stop_process()
+
+    def _update_all_process_controls(self):
+        # Update process controls on all ParameterFrames
+        for frame in self.frames.values():
+            if hasattr(frame, "update_process_controls"):
+                frame.update_process_controls()
 
 class ParameterFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -86,35 +132,88 @@ class ParameterFrame(ctk.CTkFrame):
         self.controller = controller
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
+        self._create_process_control()
         self._create_status_table()
         self._add_setup_button()
 
+    def _create_process_control(self):
+        control_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
+        control_frame.pack(pady=4, padx=4, fill="x")
+
+        # Process Name and Status
+        self.process_text = ctk.CTkLabel(
+            control_frame,
+            text=f"Process Active: {self.controller.process_name}",
+            font=("Roboto Mono", 14),
+            text_color=LABEL_COLOR
+        )
+        self.process_text.pack(side="left", padx=10)
+
+        # Timer Display
+        self.timer_label = ctk.CTkLabel(
+            control_frame,
+            text="00:00:00",
+            font=("Roboto Mono", 14, "bold"),
+            text_color=HEADER_COLOR
+        )
+        self.timer_label.pack(side="left", padx=10)
+
+        # Start/Stop Button
+        self.process_button = ctk.CTkButton(
+            control_frame,
+            text="Start Process" if not self.controller.process_active else "Stop Process",
+            command=self._toggle_process,
+            font=("Roboto Mono", 14),
+            fg_color=CURRENT_OK_COLOR if not self.controller.process_active else CURRENT_WARN_COLOR,
+            text_color=BG_DARK
+        )
+        self.process_button.pack(side="right", padx=10)
+
+        self.update_process_controls()
+
+    def _toggle_process(self):
+        if self.controller.process_active:
+            self.controller.stop_process()
+        else:
+            self.controller.start_process()
+        self.update_process_controls()
+
+    def update_process_controls(self):
+        # Update button text and color
+        self.process_button.configure(
+            text="Stop Process" if self.controller.process_active else "Start Process",
+            fg_color=CURRENT_WARN_COLOR if self.controller.process_active else CURRENT_OK_COLOR
+        )
+        # Update timer
+        t = max(0, self.controller.remaining_time)
+        time_str = str(timedelta(seconds=t))
+        if len(time_str) > 7:
+            time_str = time_str[-8:]
+        self.timer_label.configure(text=time_str)
+        # Update process name
+        self.process_text.configure(text=f"Process Active: {self.controller.process_name}")
+        # If process is running, keep updating
+        if self.controller.process_active:
+            self.after(1000, self.update_process_controls)
+
     def _create_status_table(self):
         if not hasattr(self, "status_data"):
-            self.status_data = {"Parameter": {"current": 0.0, "set": 0.0}}
-        
+            self.status_data = {"Parameter": {"current": 0.0, "set": 0.0, "units": ""}}
         table_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
-        table_frame.pack(pady=10, padx=10, fill="both", expand=True)
-        
-        # Header
+        table_frame.pack(pady=4, padx=4, fill="both", expand=True)
         ctk.CTkLabel(table_frame, text="Parameter Status",
                    font=("Roboto Mono", 16, "bold"),
-                   text_color=HEADER_COLOR).grid(row=0, column=0, columnspan=3, pady=5)
-
-        # Table Headers
-        headers = ["Parameter", "Current", "Set Value"]
+                   text_color=HEADER_COLOR).grid(row=0, column=0, columnspan=4, pady=(2, 4))
+        headers = ["Parameter", "Current", "Set Value", "Units"]
         for col, header in enumerate(headers):
             ctk.CTkLabel(table_frame, text=header,
                        font=("Roboto Mono", 14, "bold"),
-                       text_color=HEADER_COLOR).grid(row=1, column=col, padx=15, pady=3)
-
-        # Dynamic Rows
+                       text_color=HEADER_COLOR).grid(row=1, column=col, padx=6, pady=(2, 2))
         self.status_labels = {}
         for row, (param, values) in enumerate(self.status_data.items(), start=2):
             ctk.CTkLabel(table_frame, text=param,
                        font=("Roboto Mono", 14),
-                       text_color=LABEL_COLOR).grid(row=row, column=0, sticky="w", padx=15)
-            
+                       text_color=LABEL_COLOR).grid(row=row, column=0, sticky="w", padx=6, pady=(1, 1))
             current_color = CURRENT_OK_COLOR if values["current"] == values["set"] else CURRENT_WARN_COLOR
             self.status_labels[param] = {
                 "current": ctk.CTkLabel(table_frame, text=f"{values['current']:.2f}",
@@ -122,10 +221,14 @@ class ParameterFrame(ctk.CTkFrame):
                                       text_color=current_color),
                 "set": ctk.CTkLabel(table_frame, text=f"{values['set']:.2f}",
                                   font=("Roboto Mono", 14),
-                                  text_color=SET_COLOR)
+                                  text_color=SET_COLOR),
+                "units": ctk.CTkLabel(table_frame, text=values.get("units", ""),
+                                  font=("Roboto Mono", 14),
+                                  text_color=LABEL_COLOR)
             }
-            self.status_labels[param]["current"].grid(row=row, column=1, padx=15)
-            self.status_labels[param]["set"].grid(row=row, column=2, padx=15)
+            self.status_labels[param]["current"].grid(row=row, column=1, padx=6, pady=(1, 1))
+            self.status_labels[param]["set"].grid(row=row, column=2, padx=6, pady=(1, 1))
+            self.status_labels[param]["units"].grid(row=row, column=3, padx=6, pady=(1, 1))
 
     def _add_setup_button(self):
         setup_button = ctk.CTkButton(
@@ -146,44 +249,44 @@ class ParameterFrame(ctk.CTkFrame):
 class pHFrame(ParameterFrame):
     def __init__(self, parent, controller):
         self.status_data = {
-            "pH": {"current": 6.8, "set": 7.0},
-            "Buffer": {"current": 250, "set": 300}
+            "pH": {"current": 6.8, "set": 7.0, "units": ""},
+            "Buffer": {"current": 250, "set": 300, "units": "mM"}
         }
         super().__init__(parent, controller)
 
 class DOFrame(ParameterFrame):
     def __init__(self, parent, controller):
         self.status_data = {
-            "Dissolved O₂": {"current": 98.4, "set": 95.0},
-            "O₂ Flow": {"current": 2.5, "set": 2.8}
+            "Dissolved O₂": {"current": 98.4, "set": 95.0, "units": "%"},
+            "O₂ Flow": {"current": 2.5, "set": 2.8, "units": "L/min"}
         }
         super().__init__(parent, controller)
 
 class ODFrame(ParameterFrame):
     def __init__(self, parent, controller):
         self.status_data = {
-            "Optical Density": {"current": 0.42, "set": 0.50}
+            "Optical Density": {"current": 0.42, "set": 0.50, "units": "AU"}
         }
         super().__init__(parent, controller)
 
 class TempFrame(ParameterFrame):
     def __init__(self, parent, controller):
         self.status_data = {
-            "Temperature": {"current": 37.2, "set": 37.0}
+            "Temperature": {"current": 37.2, "set": 37.0, "units": "°C"}
         }
         super().__init__(parent, controller)
 
 class StirringFrame(ParameterFrame):
     def __init__(self, parent, controller):
         self.status_data = {
-            "Stir Speed": {"current": 300, "set": 350}
+            "Stir Speed": {"current": 300, "set": 350, "units": "RPM"}
         }
         super().__init__(parent, controller)
 
 class FlowFrame(ParameterFrame):
     def __init__(self, parent, controller):
         self.status_data = {
-            "Flow Rate": {"current": 2.0, "set": 2.5}
+            "Flow Rate": {"current": 2.0, "set": 2.5, "units": "mL/min"}
         }
         super().__init__(parent, controller)
 
@@ -193,27 +296,50 @@ class SetupFrame(ctk.CTkFrame):
         self.controller = controller
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
+        self._create_process_settings()
         self._create_pump_assignment_ui()
+
+    def _create_process_settings(self):
+        settings_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
+        settings_frame.pack(pady=10, padx=10, fill="x")
+
+        ctk.CTkLabel(
+            settings_frame,
+            text="Process Name:",
+            font=("Roboto Mono", 14),
+            text_color=LABEL_COLOR
+        ).pack(side="left", padx=10)
+        self.process_entry = ctk.CTkEntry(
+            settings_frame,
+            font=("Roboto Mono", 14),
+            width=200
+        )
+        self.process_entry.pack(side="left", padx=5)
+        self.process_entry.insert(0, self.controller.process_name)
+        self.process_entry.bind("<FocusOut>", self._update_process_name)
+        self.process_entry.bind("<Return>", self._update_process_name)
+
+    def _update_process_name(self, event=None):
+        self.controller.process_name = self.process_entry.get()
+        print(f"Process name updated to: {self.controller.process_name}")
+        self.controller._update_all_process_controls()
 
     def _create_pump_assignment_ui(self):
         main_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
-        main_frame.pack(pady=20, padx=20, fill="both", expand=True)
+        main_frame.pack(pady=10, padx=10, fill="both", expand=True)
 
         ctk.CTkLabel(main_frame, text="Pump Configuration",
                    font=("Roboto Mono", 16, "bold"),
-                   text_color=HEADER_COLOR).pack(pady=10)
+                   text_color=HEADER_COLOR).pack(pady=5)
 
         chemicals = ["HCl", "NaOH", "Media", "Buffer", "Waste"]
-        
         for pump in self.controller.pump_assignments:
             row_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-            row_frame.pack(fill="x", pady=5, padx=20)
-            
+            row_frame.pack(fill="x", pady=2, padx=10)
             ctk.CTkLabel(row_frame, text=f"{pump}:",
                        font=("Roboto Mono", 14),
                        text_color=LABEL_COLOR,
                        width=80).pack(side="left")
-            
             option_menu = ctk.CTkOptionMenu(
                 row_frame,
                 values=chemicals,
@@ -228,6 +354,34 @@ class SetupFrame(ctk.CTkFrame):
             option_menu.set(self.controller.pump_assignments[pump])
             option_menu.pack(side="right", fill="x", expand=True)
 
+        # --- Auto-Shutoff Controls ---
+        shutoff_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        shutoff_frame.pack(fill="x", pady=10, padx=10)
+        self.shutoff_switch = ctk.CTkSwitch(
+            shutoff_frame,
+            text="Enable Auto-Shutoff",
+            font=("Roboto Mono", 14),
+            text_color=LABEL_COLOR,
+            command=self._toggle_shutoff
+        )
+        self.shutoff_switch.pack(side="left", padx=5)
+        self.shutoff_switch.select() if self.controller.auto_shutoff_enabled else self.shutoff_switch.deselect()
+        ctk.CTkLabel(
+            shutoff_frame,
+            text="Time (min):",
+            font=("Roboto Mono", 14),
+            text_color=LABEL_COLOR,
+            width=90
+        ).pack(side="left", padx=8)
+        self.shutoff_time_entry = ctk.CTkEntry(
+            shutoff_frame,
+            width=60,
+            font=("Roboto Mono", 14)
+        )
+        self.shutoff_time_entry.pack(side="left", padx=2)
+        self.shutoff_time_entry.insert(0, str(self.controller.auto_shutoff_time))
+        self.shutoff_time_entry.bind("<FocusOut>", self._update_shutoff_time)
+        self.shutoff_time_entry.bind("<Return>", self._update_shutoff_time)
         back_button = ctk.CTkButton(
             self,
             text="Back to Dashboard",
@@ -244,6 +398,22 @@ class SetupFrame(ctk.CTkFrame):
     def _update_pump_assignment(self, pump, chemical):
         self.controller.pump_assignments[pump] = chemical
         print(f"Updated {pump} to {chemical}")
+
+    def _toggle_shutoff(self):
+        self.controller.auto_shutoff_enabled = bool(self.shutoff_switch.get())
+        print(f"Auto-shutoff enabled: {self.controller.auto_shutoff_enabled}")
+
+    def _update_shutoff_time(self, event=None):
+        try:
+            time = int(self.shutoff_time_entry.get())
+            if time > 0:
+                self.controller.auto_shutoff_time = time
+                print(f"Auto-shutoff time set to: {time} min")
+            else:
+                raise ValueError
+        except ValueError:
+            self.shutoff_time_entry.delete(0, "end")
+            self.shutoff_time_entry.insert(0, str(self.controller.auto_shutoff_time))
 
 if __name__ == "__main__":
     app = App()
