@@ -5,22 +5,22 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # Application Configuration for 5" Touchscreen
-        self.title("Bioreactor UI")
-        self.geometry("800x480")  # 5-inch touchscreen resolution
-        self.resizable(False, False)  # Fixed size
-
-        ctk.set_appearance_mode("light")
-        ctk.set_default_color_theme("blue")
+        # Application Configuration
+        self.title("Bioreactor Control v2.1")
+        self.geometry("800x480")
+        self.resizable(False, False)
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("dark-blue")
 
         self.frames = {}
         self.current_frame = None
+        self.pump_assignments = {"Pump 1": "HCl", "Pump 2": "NaOH", "Pump 3": "Media"}
         self._create_navigation()
         self._create_frames()
 
     def _create_navigation(self):
-        nav_frame = ctk.CTkFrame(self, width=150)
-        nav_frame.pack(side="left", fill="y")
+        nav_frame = ctk.CTkFrame(self, width=150, fg_color="#2b2b2b")
+        nav_frame.pack(side="left", fill="y", ipadx=5)
 
         buttons = [
             ("pH", "pHFrame"),
@@ -37,19 +37,21 @@ class App(ctk.CTk):
                 text=text,
                 command=lambda name=frame_name: self.show_frame(name),
                 height=70,
-                font=("Roboto", 18),
-                border_width=2,
-                corner_radius=10,
-                fg_color="#E0E0E0",
-                text_color="black",
+                font=("Roboto Mono", 14),
+                border_width=1,
+                corner_radius=8,
+                fg_color="#404040",
+                text_color="#00ff00",
                 border_color="#4A4A4A"
-            ).pack(fill="x")
+            ).pack(fill="x", pady=2, padx=2)
 
     def _create_frames(self):
-        container = ctk.CTkFrame(self)
+        container = ctk.CTkFrame(self, fg_color="#1a1a1a")
         container.pack(side="right", fill="both", expand=True)
+        container.grid_rowconfigure(0, weight=1)
+        container.grid_columnconfigure(0, weight=1)
 
-        for F in (pHFrame, DOFrame, ODFrame, TempFrame, StirringFrame, FlowFrame, SettingsFrame):
+        for F in (pHFrame, DOFrame, ODFrame, TempFrame, StirringFrame, FlowFrame, SetupFrame):
             frame = F(container, self)
             self.frames[F.__name__] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -57,56 +59,175 @@ class App(ctk.CTk):
         self.show_frame("pHFrame")
 
     def show_frame(self, frame_name):
-        if frame_name != "SettingsFrame":
+        if frame_name != "SetupFrame":
             self.current_frame = frame_name
         frame = self.frames[frame_name]
         frame.tkraise()
 
-# --- Blank Frames with only Settings Button ---
-
-class pHFrame(ctk.CTkFrame):
+class ParameterFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent)
+        super().__init__(parent, fg_color="#1a1a1a")
         self.controller = controller
-        self._add_settings_button()
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self._create_status_table()
+        self._add_setup_button()
 
-    def _add_settings_button(self):
-        settings_button = ctk.CTkButton(
+    def _create_status_table(self):
+        if not hasattr(self, "status_data"):
+            self.status_data = {"Parameter": {"current": 0.0, "set": 0.0}}
+        
+        table_frame = ctk.CTkFrame(self, fg_color="#2b2b2b", corner_radius=8)
+        table_frame.pack(pady=10, padx=10, fill="both", expand=True)
+        
+        # Header
+        ctk.CTkLabel(table_frame, text="Parameter Status",
+                   font=("Roboto Mono", 16, "bold"),
+                   text_color="#00ff00").grid(row=0, column=0, columnspan=3, pady=5)
+
+        # Table Headers
+        headers = ["Parameter", "Current", "Set Value"]
+        for col, header in enumerate(headers):
+            ctk.CTkLabel(table_frame, text=header,
+                       font=("Roboto Mono", 14, "bold"),
+                       text_color="#00ff00").grid(row=1, column=col, padx=15, pady=3)
+
+        # Dynamic Rows
+        self.status_labels = {}
+        for row, (param, values) in enumerate(self.status_data.items(), start=2):
+            ctk.CTkLabel(table_frame, text=param,
+                       font=("Roboto Mono", 14),
+                       text_color="white").grid(row=row, column=0, sticky="w", padx=15)
+            
+            current_color = "#00ff00" if values["current"] == values["set"] else "#ff6600"
+            self.status_labels[param] = {
+                "current": ctk.CTkLabel(table_frame, text=f"{values['current']:.2f}",
+                                      font=("Roboto Mono", 14),
+                                      text_color=current_color),
+                "set": ctk.CTkLabel(table_frame, text=f"{values['set']:.2f}",
+                                  font=("Roboto Mono", 14),
+                                  text_color="#00ff00")
+            }
+            self.status_labels[param]["current"].grid(row=row, column=1, padx=15)
+            self.status_labels[param]["set"].grid(row=row, column=2, padx=15)
+
+    def _add_setup_button(self):
+        setup_button = ctk.CTkButton(
             self,
-            text="Settings",
-            command=lambda: self.controller.show_frame("SettingsFrame"),
-            font=("Roboto", 16),
-            corner_radius=10,
-            fg_color="#E0E0E0",
-            text_color="black",
-            border_width=2,
-            border_color="#4A4A4A"
+            text="Setup",
+            command=lambda: self.controller.show_frame("SetupFrame"),
+            font=("Roboto Mono", 14),
+            corner_radius=8,
+            fg_color="#404040",
+            text_color="#00ff00",
+            border_width=1,
+            border_color="#4A4A4A",
+            width=100,
+            height=40
         )
-        settings_button.place(relx=1.0, rely=1.0, x=-10, y=-10, anchor="se")
+        setup_button.place(relx=1.0, rely=1.0, x=-10, y=-10, anchor="se")
 
-class DOFrame(pHFrame): pass
-class ODFrame(pHFrame): pass
-class TempFrame(pHFrame): pass
-class StirringFrame(pHFrame): pass
-class FlowFrame(pHFrame): pass
-
-class SettingsFrame(ctk.CTkFrame):
+class pHFrame(ParameterFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent)
+        self.status_data = {
+            "pH": {"current": 6.8, "set": 7.0},
+            "Buffer": {"current": 250, "set": 300}
+        }
+        super().__init__(parent, controller)
+
+class DOFrame(ParameterFrame):
+    def __init__(self, parent, controller):
+        self.status_data = {
+            "Dissolved O₂": {"current": 98.4, "set": 95.0},
+            "O₂ Flow": {"current": 2.5, "set": 2.8}
+        }
+        super().__init__(parent, controller)
+
+class ODFrame(ParameterFrame):
+    def __init__(self, parent, controller):
+        self.status_data = {
+            "Optical Density": {"current": 0.42, "set": 0.50}
+        }
+        super().__init__(parent, controller)
+
+class TempFrame(ParameterFrame):
+    def __init__(self, parent, controller):
+        self.status_data = {
+            "Temperature": {"current": 37.2, "set": 37.0}
+        }
+        super().__init__(parent, controller)
+
+class StirringFrame(ParameterFrame):
+    def __init__(self, parent, controller):
+        self.status_data = {
+            "Stir Speed": {"current": 300, "set": 350}
+        }
+        super().__init__(parent, controller)
+
+class FlowFrame(ParameterFrame):
+    def __init__(self, parent, controller):
+        self.status_data = {
+            "Flow Rate": {"current": 2.0, "set": 2.5}
+        }
+        super().__init__(parent, controller)
+
+class SetupFrame(ctk.CTkFrame):
+    def __init__(self, parent, controller):
+        super().__init__(parent, fg_color="#1a1a1a")
         self.controller = controller
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self._create_pump_assignment_ui()
+
+    def _create_pump_assignment_ui(self):
+        main_frame = ctk.CTkFrame(self, fg_color="#2b2b2b", corner_radius=8)
+        main_frame.pack(pady=20, padx=20, fill="both", expand=True)
+
+        ctk.CTkLabel(main_frame, text="Pump Configuration",
+                   font=("Roboto Mono", 16, "bold"),
+                   text_color="#00ff00").pack(pady=10)
+
+        chemicals = ["HCl", "NaOH", "Media", "Buffer", "Waste"]
+        
+        for pump in self.controller.pump_assignments:
+            row_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+            row_frame.pack(fill="x", pady=5, padx=20)
+            
+            ctk.CTkLabel(row_frame, text=f"{pump}:",
+                       font=("Roboto Mono", 14),
+                       text_color="white",
+                       width=80).pack(side="left")
+            
+            option_menu = ctk.CTkOptionMenu(
+                row_frame,
+                values=chemicals,
+                command=lambda value, p=pump: self._update_pump_assignment(p, value),
+                fg_color="#404040",
+                button_color="#4A4A4A",
+                text_color="#00ff00",
+                dropdown_fg_color="#2b2b2b",
+                dropdown_text_color="#00ff00",
+                font=("Roboto Mono", 14)
+            )
+            option_menu.set(self.controller.pump_assignments[pump])
+            option_menu.pack(side="right", fill="x", expand=True)
 
         back_button = ctk.CTkButton(
             self,
-            text="Back",
+            text="Back to Dashboard",
             command=lambda: self.controller.show_frame(self.controller.current_frame),
-            font=("Roboto", 20),
-            corner_radius=10,
-            fg_color="#E0E0E0",
-            text_color="black",
-            border_width=2,
+            font=("Roboto Mono", 14),
+            corner_radius=8,
+            fg_color="#404040",
+            text_color="#00ff00",
+            border_width=1,
             border_color="#4A4A4A"
         )
-        back_button.place(relx=0.5, rely=0.5, anchor="center")
+        back_button.place(relx=0.5, rely=1.0, x=0, y=-10, anchor="s")
+
+    def _update_pump_assignment(self, pump, chemical):
+        self.controller.pump_assignments[pump] = chemical
+        print(f"Updated {pump} to {chemical}")
 
 if __name__ == "__main__":
     app = App()
