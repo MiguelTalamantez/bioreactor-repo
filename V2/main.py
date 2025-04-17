@@ -90,15 +90,15 @@ class App(ctk.CTk):
             self.current_frame = frame_name
         frame = self.frames[frame_name]
         frame.tkraise()
-        # Update process controls on page switch
         if hasattr(frame, "update_process_controls"):
             frame.update_process_controls()
 
     def start_process(self):
         if not self.process_active:
             self.process_active = True
-            self.remaining_time = self.auto_shutoff_time * 60  # Convert minutes to seconds
-            self._tick_timer()
+            if self.auto_shutoff_enabled:
+                self.remaining_time = self.auto_shutoff_time * 60
+                self._tick_timer()
             self._update_all_process_controls()
             print(f"Process '{self.process_name}' started")
 
@@ -112,7 +112,7 @@ class App(ctk.CTk):
             print(f"Process '{self.process_name}' stopped")
 
     def _tick_timer(self):
-        if self.process_active and self.remaining_time > 0:
+        if self.process_active and self.auto_shutoff_enabled and self.remaining_time > 0:
             self.remaining_time -= 1
             self._update_all_process_controls()
             self.timer_id = self.after(1000, self._tick_timer)
@@ -121,7 +121,6 @@ class App(ctk.CTk):
                 self.stop_process()
 
     def _update_all_process_controls(self):
-        # Update process controls on all ParameterFrames
         for frame in self.frames.values():
             if hasattr(frame, "update_process_controls"):
                 frame.update_process_controls()
@@ -158,16 +157,19 @@ class ParameterFrame(ctk.CTkFrame):
         )
         self.timer_label.pack(side="left", padx=10)
 
-        # Start/Stop Button
+        # Start/Stop Button (Larger size)
         self.process_button = ctk.CTkButton(
             control_frame,
             text="Start Process" if not self.controller.process_active else "Stop Process",
             command=self._toggle_process,
-            font=("Roboto Mono", 14),
+            font=("Roboto Mono", 16, "bold"),
             fg_color=CURRENT_OK_COLOR if not self.controller.process_active else CURRENT_WARN_COLOR,
-            text_color=BG_DARK
+            text_color=BG_DARK,
+            width=180,
+            height=60,
+            corner_radius=12
         )
-        self.process_button.pack(side="right", padx=10)
+        self.process_button.pack(side="right", padx=10, pady=2)
 
         self.update_process_controls()
 
@@ -179,21 +181,24 @@ class ParameterFrame(ctk.CTkFrame):
         self.update_process_controls()
 
     def update_process_controls(self):
-        # Update button text and color
         self.process_button.configure(
             text="Stop Process" if self.controller.process_active else "Start Process",
             fg_color=CURRENT_WARN_COLOR if self.controller.process_active else CURRENT_OK_COLOR
         )
-        # Update timer
-        t = max(0, self.controller.remaining_time)
-        time_str = str(timedelta(seconds=t))
-        if len(time_str) > 7:
-            time_str = time_str[-8:]
-        self.timer_label.configure(text=time_str)
-        # Update process name
+        # Timer logic
+        if self.controller.process_active and self.controller.auto_shutoff_enabled:
+            t = max(0, self.controller.remaining_time)
+            time_str = str(timedelta(seconds=t))
+            if len(time_str) > 7:
+                time_str = time_str[-8:]
+            self.timer_label.configure(text=time_str)
+        elif self.controller.process_active and not self.controller.auto_shutoff_enabled:
+            self.timer_label.configure(text="Manual")
+        else:
+            self.timer_label.configure(text="00:00:00")
         self.process_text.configure(text=f"Process Active: {self.controller.process_name}")
-        # If process is running, keep updating
-        if self.controller.process_active:
+        # If process is running and auto-shutoff is on, keep updating
+        if self.controller.process_active and self.controller.auto_shutoff_enabled:
             self.after(1000, self.update_process_controls)
 
     def _create_status_table(self):
@@ -309,6 +314,7 @@ class SetupFrame(ctk.CTkFrame):
             font=("Roboto Mono", 14),
             text_color=LABEL_COLOR
         ).pack(side="left", padx=10)
+        
         self.process_entry = ctk.CTkEntry(
             settings_frame,
             font=("Roboto Mono", 14),
@@ -320,9 +326,11 @@ class SetupFrame(ctk.CTkFrame):
         self.process_entry.bind("<Return>", self._update_process_name)
 
     def _update_process_name(self, event=None):
-        self.controller.process_name = self.process_entry.get()
-        print(f"Process name updated to: {self.controller.process_name}")
-        self.controller._update_all_process_controls()
+        new_name = self.process_entry.get()
+        if new_name != self.controller.process_name:
+            self.controller.process_name = new_name
+            print(f"Process name updated to: {self.controller.process_name}")
+            self.controller._update_all_process_controls()
 
     def _create_pump_assignment_ui(self):
         main_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
@@ -402,6 +410,7 @@ class SetupFrame(ctk.CTkFrame):
     def _toggle_shutoff(self):
         self.controller.auto_shutoff_enabled = bool(self.shutoff_switch.get())
         print(f"Auto-shutoff enabled: {self.controller.auto_shutoff_enabled}")
+        self.controller._update_all_process_controls()
 
     def _update_shutoff_time(self, event=None):
         try:
