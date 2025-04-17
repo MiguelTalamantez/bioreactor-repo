@@ -1,6 +1,17 @@
 import customtkinter as ctk
 import tkinter as tk
 
+# --- Color Palette ---
+HEADER_COLOR = "#B0C4DE"
+LABEL_COLOR = "#E0E0E0"
+NAV_TEXT_COLOR = "#D6EAF8"
+CURRENT_OK_COLOR = "#6FCF97"
+CURRENT_WARN_COLOR = "#FFA94D"
+SET_COLOR = "#5DADE2"
+BG_DARK = "#1a1a1a"
+BG_MED = "#2b2b2b"
+BTN_BG = "#404040"
+
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -14,12 +25,17 @@ class App(ctk.CTk):
 
         self.frames = {}
         self.current_frame = None
-        self.pump_assignments = {"Pump 1": "HCl", "Pump 2": "NaOH", "Pump 3": "Media"}
+        self.pump_assignments = {
+            "Pump 1": "HCl",
+            "Pump 2": "NaOH",
+            "Pump 3": "Media",
+            "Pump 4": "Waste"
+        }
         self._create_navigation()
         self._create_frames()
 
     def _create_navigation(self):
-        nav_frame = ctk.CTkFrame(self, width=150, fg_color="#2b2b2b")
+        nav_frame = ctk.CTkFrame(self, width=150, fg_color=BG_MED)
         nav_frame.pack(side="left", fill="y", ipadx=5)
 
         buttons = [
@@ -40,13 +56,13 @@ class App(ctk.CTk):
                 font=("Roboto Mono", 14),
                 border_width=1,
                 corner_radius=8,
-                fg_color="#404040",
-                text_color="#00ff00",
+                fg_color=BTN_BG,
+                text_color=NAV_TEXT_COLOR,
                 border_color="#4A4A4A"
             ).pack(fill="x", pady=2, padx=2)
 
     def _create_frames(self):
-        container = ctk.CTkFrame(self, fg_color="#1a1a1a")
+        container = ctk.CTkFrame(self, fg_color=BG_DARK)
         container.pack(side="right", fill="both", expand=True)
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
@@ -66,7 +82,7 @@ class App(ctk.CTk):
 
 class ParameterFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color="#1a1a1a")
+        super().__init__(parent, fg_color=BG_DARK)
         self.controller = controller
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -77,36 +93,36 @@ class ParameterFrame(ctk.CTkFrame):
         if not hasattr(self, "status_data"):
             self.status_data = {"Parameter": {"current": 0.0, "set": 0.0}}
         
-        table_frame = ctk.CTkFrame(self, fg_color="#2b2b2b", corner_radius=8)
+        table_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         table_frame.pack(pady=10, padx=10, fill="both", expand=True)
         
         # Header
         ctk.CTkLabel(table_frame, text="Parameter Status",
                    font=("Roboto Mono", 16, "bold"),
-                   text_color="#00ff00").grid(row=0, column=0, columnspan=3, pady=5)
+                   text_color=HEADER_COLOR).grid(row=0, column=0, columnspan=3, pady=5)
 
         # Table Headers
         headers = ["Parameter", "Current", "Set Value"]
         for col, header in enumerate(headers):
             ctk.CTkLabel(table_frame, text=header,
                        font=("Roboto Mono", 14, "bold"),
-                       text_color="#00ff00").grid(row=1, column=col, padx=15, pady=3)
+                       text_color=HEADER_COLOR).grid(row=1, column=col, padx=15, pady=3)
 
         # Dynamic Rows
         self.status_labels = {}
         for row, (param, values) in enumerate(self.status_data.items(), start=2):
             ctk.CTkLabel(table_frame, text=param,
                        font=("Roboto Mono", 14),
-                       text_color="white").grid(row=row, column=0, sticky="w", padx=15)
+                       text_color=LABEL_COLOR).grid(row=row, column=0, sticky="w", padx=15)
             
-            current_color = "#00ff00" if values["current"] == values["set"] else "#ff6600"
+            current_color = CURRENT_OK_COLOR if values["current"] == values["set"] else CURRENT_WARN_COLOR
             self.status_labels[param] = {
                 "current": ctk.CTkLabel(table_frame, text=f"{values['current']:.2f}",
                                       font=("Roboto Mono", 14),
                                       text_color=current_color),
                 "set": ctk.CTkLabel(table_frame, text=f"{values['set']:.2f}",
                                   font=("Roboto Mono", 14),
-                                  text_color="#00ff00")
+                                  text_color=SET_COLOR)
             }
             self.status_labels[param]["current"].grid(row=row, column=1, padx=15)
             self.status_labels[param]["set"].grid(row=row, column=2, padx=15)
@@ -118,8 +134,8 @@ class ParameterFrame(ctk.CTkFrame):
             command=lambda: self.controller.show_frame("SetupFrame"),
             font=("Roboto Mono", 14),
             corner_radius=8,
-            fg_color="#404040",
-            text_color="#00ff00",
+            fg_color=BTN_BG,
+            text_color=HEADER_COLOR,
             border_width=1,
             border_color="#4A4A4A",
             width=100,
@@ -173,19 +189,19 @@ class FlowFrame(ParameterFrame):
 
 class SetupFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color="#1a1a1a")
+        super().__init__(parent, fg_color=BG_DARK)
         self.controller = controller
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self._create_pump_assignment_ui()
 
     def _create_pump_assignment_ui(self):
-        main_frame = ctk.CTkFrame(self, fg_color="#2b2b2b", corner_radius=8)
+        main_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         main_frame.pack(pady=20, padx=20, fill="both", expand=True)
 
         ctk.CTkLabel(main_frame, text="Pump Configuration",
                    font=("Roboto Mono", 16, "bold"),
-                   text_color="#00ff00").pack(pady=10)
+                   text_color=HEADER_COLOR).pack(pady=10)
 
         chemicals = ["HCl", "NaOH", "Media", "Buffer", "Waste"]
         
@@ -195,18 +211,18 @@ class SetupFrame(ctk.CTkFrame):
             
             ctk.CTkLabel(row_frame, text=f"{pump}:",
                        font=("Roboto Mono", 14),
-                       text_color="white",
+                       text_color=LABEL_COLOR,
                        width=80).pack(side="left")
             
             option_menu = ctk.CTkOptionMenu(
                 row_frame,
                 values=chemicals,
                 command=lambda value, p=pump: self._update_pump_assignment(p, value),
-                fg_color="#404040",
+                fg_color=BTN_BG,
                 button_color="#4A4A4A",
-                text_color="#00ff00",
-                dropdown_fg_color="#2b2b2b",
-                dropdown_text_color="#00ff00",
+                text_color=HEADER_COLOR,
+                dropdown_fg_color=BG_MED,
+                dropdown_text_color=HEADER_COLOR,
                 font=("Roboto Mono", 14)
             )
             option_menu.set(self.controller.pump_assignments[pump])
@@ -218,8 +234,8 @@ class SetupFrame(ctk.CTkFrame):
             command=lambda: self.controller.show_frame(self.controller.current_frame),
             font=("Roboto Mono", 14),
             corner_radius=8,
-            fg_color="#404040",
-            text_color="#00ff00",
+            fg_color=BTN_BG,
+            text_color=HEADER_COLOR,
             border_width=1,
             border_color="#4A4A4A"
         )
