@@ -1,6 +1,11 @@
 import customtkinter as ctk
 import tkinter as tk
 from datetime import timedelta
+import matplotlib
+matplotlib.use("TkAgg")
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+import random
 
 # --- Color Palette ---
 HEADER_COLOR = "#B0C4DE"
@@ -16,8 +21,6 @@ BTN_BG = "#404040"
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-
-        # Application Configuration
         self.title("Bioreactor Control v2.1")
         self.geometry("800x480")
         self.resizable(False, False)
@@ -33,7 +36,7 @@ class App(ctk.CTk):
             "Pump 4": "Waste"
         }
         self.auto_shutoff_enabled = False
-        self.auto_shutoff_time = 60  # default 60 minutes
+        self.auto_shutoff_time = 60
         self.process_name = "Default Process"
         self.process_active = False
         self.remaining_time = 0
@@ -139,7 +142,6 @@ class ParameterFrame(ctk.CTkFrame):
         control_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         control_frame.pack(pady=4, padx=4, fill="x")
 
-        # Process Name and Status
         self.process_text = ctk.CTkLabel(
             control_frame,
             text=f"Process Active: {self.controller.process_name}",
@@ -148,7 +150,6 @@ class ParameterFrame(ctk.CTkFrame):
         )
         self.process_text.pack(side="left", padx=10)
 
-        # Timer Display
         self.timer_label = ctk.CTkLabel(
             control_frame,
             text="00:00:00",
@@ -157,7 +158,6 @@ class ParameterFrame(ctk.CTkFrame):
         )
         self.timer_label.pack(side="left", padx=10)
 
-        # Start/Stop Button (Larger size)
         self.process_button = ctk.CTkButton(
             control_frame,
             text="Start Process" if not self.controller.process_active else "Stop Process",
@@ -170,7 +170,6 @@ class ParameterFrame(ctk.CTkFrame):
             corner_radius=12
         )
         self.process_button.pack(side="right", padx=10, pady=2)
-
         self.update_process_controls()
 
     def _toggle_process(self):
@@ -185,7 +184,6 @@ class ParameterFrame(ctk.CTkFrame):
             text="Stop Process" if self.controller.process_active else "Start Process",
             fg_color=CURRENT_WARN_COLOR if self.controller.process_active else CURRENT_OK_COLOR
         )
-        # Timer logic
         if self.controller.process_active and self.controller.auto_shutoff_enabled:
             t = max(0, self.controller.remaining_time)
             time_str = str(timedelta(seconds=t))
@@ -197,37 +195,38 @@ class ParameterFrame(ctk.CTkFrame):
         else:
             self.timer_label.configure(text="00:00:00")
         self.process_text.configure(text=f"Process Active: {self.controller.process_name}")
-        # If process is running and auto-shutoff is on, keep updating
         if self.controller.process_active and self.controller.auto_shutoff_enabled:
             self.after(1000, self.update_process_controls)
 
     def _create_status_table(self):
         if not hasattr(self, "status_data"):
             self.status_data = {"Parameter": {"current": 0.0, "set": 0.0, "units": ""}}
-        table_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
-        table_frame.pack(pady=4, padx=4, fill="both", expand=True)
-        ctk.CTkLabel(table_frame, text="Parameter Status",
+        
+        self.table_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
+        self.table_frame.pack(pady=4, padx=4, fill="both", expand=True)
+
+        ctk.CTkLabel(self.table_frame, text="Parameter Status",
                    font=("Roboto Mono", 16, "bold"),
                    text_color=HEADER_COLOR).grid(row=0, column=0, columnspan=4, pady=(2, 4))
         headers = ["Parameter", "Current", "Set Value", "Units"]
         for col, header in enumerate(headers):
-            ctk.CTkLabel(table_frame, text=header,
+            ctk.CTkLabel(self.table_frame, text=header,
                        font=("Roboto Mono", 14, "bold"),
                        text_color=HEADER_COLOR).grid(row=1, column=col, padx=6, pady=(2, 2))
         self.status_labels = {}
         for row, (param, values) in enumerate(self.status_data.items(), start=2):
-            ctk.CTkLabel(table_frame, text=param,
+            ctk.CTkLabel(self.table_frame, text=param,
                        font=("Roboto Mono", 14),
                        text_color=LABEL_COLOR).grid(row=row, column=0, sticky="w", padx=6, pady=(1, 1))
             current_color = CURRENT_OK_COLOR if values["current"] == values["set"] else CURRENT_WARN_COLOR
             self.status_labels[param] = {
-                "current": ctk.CTkLabel(table_frame, text=f"{values['current']:.2f}",
+                "current": ctk.CTkLabel(self.table_frame, text=f"{values['current']:.2f}",
                                       font=("Roboto Mono", 14),
                                       text_color=current_color),
-                "set": ctk.CTkLabel(table_frame, text=f"{values['set']:.2f}",
+                "set": ctk.CTkLabel(self.table_frame, text=f"{values['set']:.2f}",
                                   font=("Roboto Mono", 14),
                                   text_color=SET_COLOR),
-                "units": ctk.CTkLabel(table_frame, text=values.get("units", ""),
+                "units": ctk.CTkLabel(self.table_frame, text=values.get("units", ""),
                                   font=("Roboto Mono", 14),
                                   text_color=LABEL_COLOR)
             }
@@ -258,6 +257,77 @@ class pHFrame(ParameterFrame):
             "Buffer": {"current": 250, "set": 300, "units": "mM"}
         }
         super().__init__(parent, controller)
+        self._add_ph_graph()
+        self._add_setpoint_controls()
+
+    def _add_ph_graph(self):
+        self.table_frame.grid_rowconfigure(0, weight=1)
+        self.table_frame.grid_columnconfigure(0, weight=1)
+        
+        self.fig = Figure(figsize=(6, 3), dpi=100, facecolor=BG_MED)
+        self.ax = self.fig.add_subplot(111)
+        self.ax.set_facecolor(BG_DARK)
+        self.ax.tick_params(colors='white')
+        self.ax.xaxis.label.set_color('white')
+        self.ax.yaxis.label.set_color('white')
+        self.ax.spines['bottom'].set_color('white')
+        self.ax.spines['top'].set_color('white') 
+        self.ax.spines['right'].set_color('white')
+        self.ax.spines['left'].set_color('white')
+        
+        self.time_points = []
+        self.actual_ph = []
+        self.set_ph = []
+        
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.table_frame)
+        self.canvas.get_tk_widget().grid(row=2, column=0, columnspan=4, 
+                                      sticky='nsew', padx=10, pady=10)
+
+    def _add_setpoint_controls(self):
+        control_frame = ctk.CTkFrame(self.table_frame, fg_color=BG_MED)
+        control_frame.grid(row=3, column=0, columnspan=4, sticky='ew', padx=10, pady=10)
+        
+        ctk.CTkLabel(control_frame, text="Time (min):", 
+                   font=("Roboto Mono", 14)).grid(row=0, column=0, padx=5)
+        self.time_entry = ctk.CTkEntry(control_frame, width=80)
+        self.time_entry.grid(row=0, column=1, padx=5)
+        
+        ctk.CTkLabel(control_frame, text="Set pH:", 
+                   font=("Roboto Mono", 14)).grid(row=0, column=2, padx=5)
+        self.ph_entry = ctk.CTkEntry(control_frame, width=80)
+        self.ph_entry.grid(row=0, column=3, padx=5)
+        
+        ctk.CTkButton(control_frame, text="Add Setpoint", 
+                    command=self._add_setpoint,
+                    fg_color=SET_COLOR).grid(row=0, column=4, padx=10)
+
+    def _add_setpoint(self):
+        try:
+            time = float(self.time_entry.get())
+            ph = float(self.ph_entry.get())
+            
+            self.set_ph.append(ph)
+            self.time_points.append(time)
+            self.actual_ph.append(ph + random.uniform(-0.1, 0.1))
+            self._update_plot()
+            self.time_entry.delete(0, 'end')
+            self.ph_entry.delete(0, 'end')
+            
+        except ValueError:
+            print("Invalid input values")
+
+    def _update_plot(self):
+        self.ax.clear()
+        self.ax.plot(self.time_points, self.actual_ph, 
+                   label='Actual pH', color=CURRENT_OK_COLOR)
+        self.ax.step(self.time_points, self.set_ph, where='post', 
+                   label='Set pH', color=SET_COLOR, linestyle='--')
+        self.ax.set_xlabel('Time (min)', color='white')
+        self.ax.set_ylabel('pH', color='white')
+        self.ax.legend(facecolor=BG_MED, labelcolor='white')
+        self.ax.grid(color='#4a4a4a', linestyle='--')
+        self.canvas.draw()
+
 
 class DOFrame(ParameterFrame):
     def __init__(self, parent, controller):
