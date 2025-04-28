@@ -5,7 +5,15 @@ import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+import RPi.GPIO as GPIO
+import threading
+import time
 
+# Hardware Constants
+STEP_PIN = 19
+DIR_PIN = 21
+
+# UI Constants
 HEADER_COLOR = "#B0C4DE"
 LABEL_COLOR = "#E0E0E0"
 NAV_TEXT_COLOR = "#D6EAF8"
@@ -16,6 +24,45 @@ BG_DARK = "#1a1a1a"
 BG_MED = "#2b2b2b"
 BTN_BG = "#404040"
 DEV_COLOR = "#8E44AD"
+
+class KPMP10PumpController:
+    def __init__(self, step_pin=STEP_PIN, dir_pin=DIR_PIN):
+        self.step_pin = step_pin
+        self.dir_pin = dir_pin
+        self.running = False
+        self.thread = None
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setwarnings(False)
+        GPIO.setup(self.step_pin, GPIO.OUT)
+        GPIO.setup(self.dir_pin, GPIO.OUT)
+
+    def run(self, direction=1, steps=200, speed=0.001):
+        if self.running:
+            return
+        self.running = True
+        GPIO.output(self.dir_pin, direction)
+        
+        def worker():
+            for _ in range(steps):
+                if not self.running:
+                    break
+                GPIO.output(self.step_pin, 1)
+                time.sleep(speed)
+                GPIO.output(self.step_pin, 0)
+                time.sleep(speed)
+            self.running = False
+            
+        self.thread = threading.Thread(target=worker, daemon=True)
+        self.thread.start()
+
+    def stop(self):
+        self.running = False
+        if self.thread:
+            self.thread.join(timeout=1)
+
+    def cleanup(self):
+        self.stop()
+        GPIO.cleanup()
 
 class App(ctk.CTk):
     def __init__(self):
@@ -30,7 +77,7 @@ class App(ctk.CTk):
         self.current_frame = None
         self.pump_assignments = {
             "Pump 1": "HCl",
-            "Pump 2": "NaOH",
+            "Pump 2": "NaOH", 
             "Pump 3": "Media",
             "Pump 4": "Waste"
         }
@@ -486,6 +533,7 @@ class DeveloperFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=BG_DARK)
         self.controller = controller
+        self.kpmp10 = KPMP10PumpController()
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self._create_pump_controls()
@@ -499,28 +547,41 @@ class DeveloperFrame(ctk.CTkFrame):
         ctk.CTkLabel(pump_frame, text="Pump Controls",
                    font=("Roboto Mono", 16, "bold"),
                    text_color=HEADER_COLOR).pack(pady=5)
+        
         for pump in self.controller.pump_assignments:
             pump_row = ctk.CTkFrame(pump_frame, fg_color="transparent")
             pump_row.pack(fill="x", pady=2, padx=10)
             ctk.CTkLabel(pump_row, text=f"{pump}:",
                        font=("Roboto Mono", 14),
                        text_color=LABEL_COLOR).pack(side="left")
+            
             btn_frame = ctk.CTkFrame(pump_row, fg_color="transparent")
             btn_frame.pack(side="right")
+            
             ctk.CTkButton(btn_frame, text="▶",
                         command=lambda p=pump: self._pump_action(p, "RIGHT"),
                         width=40,
                         fg_color=DEV_COLOR).pack(side="left", padx=2)
+            
             ctk.CTkButton(btn_frame, text="◀",
                         command=lambda p=pump: self._pump_action(p, "LEFT"),
                         width=40,
                         fg_color=DEV_COLOR).pack(side="left", padx=2)
+            
             ctk.CTkButton(btn_frame, text="⏹",
                         command=lambda p=pump: self._pump_action(p, "STOP"),
                         width=40,
                         fg_color=CURRENT_WARN_COLOR).pack(side="left", padx=2)
 
     def _pump_action(self, pump, action):
+        if pump == "Pump 1":
+            if action == "RIGHT":
+                self.kpmp10.run(direction=1)
+            elif action == "LEFT":
+                self.kpmp10.run(direction=0)
+            elif action == "STOP":
+                self.kpmp10.stop()
+        
         self.controller.device_states["pumps"][pump] = action
         print(f"{pump} {action}")
 
@@ -579,5 +640,9 @@ class DeveloperFrame(ctk.CTkFrame):
         back_button.place(relx=0.5, rely=1.0, x=0, y=-10, anchor="s")
 
 if __name__ == "__main__":
-    app = App()
-    app.mainloop()
+    try:
+        app = App()
+        app.mainloop()
+    finally:
+        if hasattr(app.frames.get("DeveloperFrame", None), "kpmp10"):
+            app.frames["DeveloperFrame"].kpmp10.cleanup()
