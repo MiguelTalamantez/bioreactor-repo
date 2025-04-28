@@ -5,9 +5,7 @@ import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
-import random
 
-# --- Color Palette ---
 HEADER_COLOR = "#B0C4DE"
 LABEL_COLOR = "#E0E0E0"
 NAV_TEXT_COLOR = "#D6EAF8"
@@ -59,6 +57,7 @@ class App(ctk.CTk):
             ("Temperature", "TempFrame"),
             ("Stirring", "StirringFrame"),
             ("Flow", "FlowFrame"),
+            ("Setup", "SetupFrame")
         ]
 
         for text, frame_name in buttons:
@@ -66,13 +65,14 @@ class App(ctk.CTk):
                 button_container,
                 text=text,
                 command=lambda name=frame_name: self.show_frame(name),
-                height=70,
-                font=("Roboto Mono", 14),
+                height=60,
+                font=("Roboto Mono", 15),
                 border_width=1,
                 corner_radius=8,
                 fg_color=BTN_BG,
                 text_color=NAV_TEXT_COLOR,
-                border_color="#4A4A4A"
+                border_color="#4A4A4A",
+                width=140
             ).pack(fill="x", pady=2, padx=2)
 
     def _create_frames(self):
@@ -89,12 +89,11 @@ class App(ctk.CTk):
         self.show_frame("pHFrame")
 
     def show_frame(self, frame_name):
-        if frame_name != "SetupFrame":
-            self.current_frame = frame_name
         frame = self.frames[frame_name]
         frame.tkraise()
         if hasattr(frame, "update_process_controls"):
             frame.update_process_controls()
+        self.current_frame = frame_name
 
     def start_process(self):
         if not self.process_active:
@@ -135,8 +134,7 @@ class ParameterFrame(ctk.CTkFrame):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self._create_process_control()
-        self._create_status_table()
-        self._add_setup_button()
+        self._create_condensed_status_table()
 
     def _create_process_control(self):
         control_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
@@ -198,57 +196,45 @@ class ParameterFrame(ctk.CTkFrame):
         if self.controller.process_active and self.controller.auto_shutoff_enabled:
             self.after(1000, self.update_process_controls)
 
-    def _create_status_table(self):
+    def _create_condensed_status_table(self):
         if not hasattr(self, "status_data"):
             self.status_data = {"Parameter": {"current": 0.0, "set": 0.0, "units": ""}}
         
-        self.table_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
-        self.table_frame.pack(pady=4, padx=4, fill="both", expand=True)
+        self.status_table_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
+        self.status_table_frame.pack(pady=(2, 2), padx=4, fill="x")
 
-        ctk.CTkLabel(self.table_frame, text="Parameter Status",
-                   font=("Roboto Mono", 16, "bold"),
-                   text_color=HEADER_COLOR).grid(row=0, column=0, columnspan=4, pady=(2, 4))
-        headers = ["Parameter", "Current", "Set Value", "Units"]
+        self.status_table_frame.grid_columnconfigure(0, weight=1, uniform="col")
+        self.status_table_frame.grid_columnconfigure(1, weight=1, uniform="col")
+        self.status_table_frame.grid_columnconfigure(2, weight=1, uniform="col")
+        self.status_table_frame.grid_columnconfigure(3, weight=1, uniform="col")
+
+        headers = ["Parameter", "Current", "Set", "Units"]
         for col, header in enumerate(headers):
-            ctk.CTkLabel(self.table_frame, text=header,
+            ctk.CTkLabel(self.status_table_frame, text=header,
                        font=("Roboto Mono", 14, "bold"),
-                       text_color=HEADER_COLOR).grid(row=1, column=col, padx=6, pady=(2, 2))
+                       text_color=HEADER_COLOR).grid(row=0, column=col, pady=(0, 1), sticky="ew")
+
         self.status_labels = {}
-        for row, (param, values) in enumerate(self.status_data.items(), start=2):
-            ctk.CTkLabel(self.table_frame, text=param,
-                       font=("Roboto Mono", 14),
-                       text_color=LABEL_COLOR).grid(row=row, column=0, sticky="w", padx=6, pady=(1, 1))
+        for row, (param, values) in enumerate(self.status_data.items(), start=1):
+            ctk.CTkLabel(self.status_table_frame, text=param,
+                       font=("Roboto Mono", 13),
+                       text_color=LABEL_COLOR).grid(row=row, column=0, sticky="w", padx=6)
+
             current_color = CURRENT_OK_COLOR if values["current"] == values["set"] else CURRENT_WARN_COLOR
             self.status_labels[param] = {
-                "current": ctk.CTkLabel(self.table_frame, text=f"{values['current']:.2f}",
-                                      font=("Roboto Mono", 14),
+                "current": ctk.CTkLabel(self.status_table_frame, text=f"{values['current']:.2f}",
+                                      font=("Roboto Mono", 13),
                                       text_color=current_color),
-                "set": ctk.CTkLabel(self.table_frame, text=f"{values['set']:.2f}",
-                                  font=("Roboto Mono", 14),
+                "set": ctk.CTkLabel(self.status_table_frame, text=f"{values['set']:.2f}",
+                                  font=("Roboto Mono", 13),
                                   text_color=SET_COLOR),
-                "units": ctk.CTkLabel(self.table_frame, text=values.get("units", ""),
-                                  font=("Roboto Mono", 14),
+                "units": ctk.CTkLabel(self.status_table_frame, text=values.get("units", ""),
+                                  font=("Roboto Mono", 13),
                                   text_color=LABEL_COLOR)
             }
-            self.status_labels[param]["current"].grid(row=row, column=1, padx=6, pady=(1, 1))
-            self.status_labels[param]["set"].grid(row=row, column=2, padx=6, pady=(1, 1))
-            self.status_labels[param]["units"].grid(row=row, column=3, padx=6, pady=(1, 1))
-
-    def _add_setup_button(self):
-        setup_button = ctk.CTkButton(
-            self,
-            text="Setup",
-            command=lambda: self.controller.show_frame("SetupFrame"),
-            font=("Roboto Mono", 14),
-            corner_radius=8,
-            fg_color=BTN_BG,
-            text_color=HEADER_COLOR,
-            border_width=1,
-            border_color="#4A4A4A",
-            width=100,
-            height=40
-        )
-        setup_button.place(relx=1.0, rely=1.0, x=-10, y=-10, anchor="se")
+            self.status_labels[param]["current"].grid(row=row, column=1, sticky="ew")
+            self.status_labels[param]["set"].grid(row=row, column=2, sticky="ew")
+            self.status_labels[param]["units"].grid(row=row, column=3, sticky="ew")
 
 class pHFrame(ParameterFrame):
     def __init__(self, parent, controller):
@@ -258,13 +244,13 @@ class pHFrame(ParameterFrame):
         }
         super().__init__(parent, controller)
         self._add_ph_graph()
-        self._add_setpoint_controls()
+        self._add_improved_setpoint_controls()
 
     def _add_ph_graph(self):
-        self.table_frame.grid_rowconfigure(0, weight=1)
-        self.table_frame.grid_columnconfigure(0, weight=1)
-        
-        self.fig = Figure(figsize=(6, 3), dpi=100, facecolor=BG_MED)
+        self.graph_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
+        self.graph_frame.pack(pady=(2, 2), padx=4, fill="both", expand=True)
+
+        self.fig = Figure(figsize=(6, 2.5), dpi=100, facecolor=BG_MED)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_facecolor(BG_DARK)
         self.ax.tick_params(colors='white')
@@ -274,52 +260,68 @@ class pHFrame(ParameterFrame):
         self.ax.spines['top'].set_color('white') 
         self.ax.spines['right'].set_color('white')
         self.ax.spines['left'].set_color('white')
-        
-        self.time_points = []
-        self.actual_ph = []
-        self.set_ph = []
-        
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.table_frame)
-        self.canvas.get_tk_widget().grid(row=2, column=0, columnspan=4, 
-                                      sticky='nsew', padx=10, pady=10)
 
-    def _add_setpoint_controls(self):
-        control_frame = ctk.CTkFrame(self.table_frame, fg_color=BG_MED)
-        control_frame.grid(row=3, column=0, columnspan=4, sticky='ew', padx=10, pady=10)
-        
+        self.time_points = []
+        self.set_ph = []
+
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)
+        self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
+
+    def _add_improved_setpoint_controls(self):
+        control_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
+        control_frame.pack(pady=(2, 8), padx=4, fill="x")
+
+        control_frame.grid_columnconfigure(0, weight=1)
+        control_frame.grid_columnconfigure(1, weight=1)
+        control_frame.grid_columnconfigure(2, weight=1)
+
         ctk.CTkLabel(control_frame, text="Time (min):", 
-                   font=("Roboto Mono", 14)).grid(row=0, column=0, padx=5)
-        self.time_entry = ctk.CTkEntry(control_frame, width=80)
-        self.time_entry.grid(row=0, column=1, padx=5)
+                   font=("Roboto Mono", 13)).grid(row=0, column=0, padx=2, sticky="e")
+        self.time_entry = ctk.CTkEntry(control_frame, width=70, font=("Roboto Mono", 13))
+        self.time_entry.grid(row=0, column=1, padx=2, sticky="w")
         
         ctk.CTkLabel(control_frame, text="Set pH:", 
-                   font=("Roboto Mono", 14)).grid(row=0, column=2, padx=5)
-        self.ph_entry = ctk.CTkEntry(control_frame, width=80)
-        self.ph_entry.grid(row=0, column=3, padx=5)
+                   font=("Roboto Mono", 13)).grid(row=0, column=2, padx=2, sticky="e")
+        self.ph_entry = ctk.CTkEntry(control_frame, width=70, font=("Roboto Mono", 13))
+        self.ph_entry.grid(row=0, column=3, padx=2, sticky="w")
+
+        btn_frame = ctk.CTkFrame(control_frame, fg_color="transparent")
+        btn_frame.grid(row=0, column=4, columnspan=2, padx=5)
         
-        ctk.CTkButton(control_frame, text="Add Setpoint", 
-                    command=self._add_setpoint,
-                    fg_color=SET_COLOR).grid(row=0, column=4, padx=10)
+        ctk.CTkButton(btn_frame, text="Add Setpoint",
+                      command=self._add_setpoint,
+                      fg_color=BTN_BG,
+                      text_color=NAV_TEXT_COLOR,
+                      font=("Roboto Mono", 13),
+                      width=100).pack(side="left", padx=2)
+        
+        ctk.CTkButton(btn_frame, text="Remove Last",
+                      command=self._remove_setpoint,
+                      fg_color=BTN_BG,
+                      text_color=NAV_TEXT_COLOR,
+                      font=("Roboto Mono", 13),
+                      width=100).pack(side="left", padx=2)
 
     def _add_setpoint(self):
         try:
             time = float(self.time_entry.get())
             ph = float(self.ph_entry.get())
-            
             self.set_ph.append(ph)
             self.time_points.append(time)
-            self.actual_ph.append(ph + random.uniform(-0.1, 0.1))
             self._update_plot()
             self.time_entry.delete(0, 'end')
             self.ph_entry.delete(0, 'end')
-            
         except ValueError:
             print("Invalid input values")
 
+    def _remove_setpoint(self):
+        if len(self.set_ph) > 0:
+            self.set_ph.pop()
+            self.time_points.pop()
+            self._update_plot()
+
     def _update_plot(self):
         self.ax.clear()
-        self.ax.plot(self.time_points, self.actual_ph, 
-                   label='Actual pH', color=CURRENT_OK_COLOR)
         self.ax.step(self.time_points, self.set_ph, where='post', 
                    label='Set pH', color=SET_COLOR, linestyle='--')
         self.ax.set_xlabel('Time (min)', color='white')
@@ -327,7 +329,6 @@ class pHFrame(ParameterFrame):
         self.ax.legend(facecolor=BG_MED, labelcolor='white')
         self.ax.grid(color='#4a4a4a', linestyle='--')
         self.canvas.draw()
-
 
 class DOFrame(ParameterFrame):
     def __init__(self, parent, controller):
@@ -432,7 +433,6 @@ class SetupFrame(ctk.CTkFrame):
             option_menu.set(self.controller.pump_assignments[pump])
             option_menu.pack(side="right", fill="x", expand=True)
 
-        # --- Auto-Shutoff Controls ---
         shutoff_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         shutoff_frame.pack(fill="x", pady=10, padx=10)
         self.shutoff_switch = ctk.CTkSwitch(
@@ -460,18 +460,6 @@ class SetupFrame(ctk.CTkFrame):
         self.shutoff_time_entry.insert(0, str(self.controller.auto_shutoff_time))
         self.shutoff_time_entry.bind("<FocusOut>", self._update_shutoff_time)
         self.shutoff_time_entry.bind("<Return>", self._update_shutoff_time)
-        back_button = ctk.CTkButton(
-            self,
-            text="Back to Dashboard",
-            command=lambda: self.controller.show_frame(self.controller.current_frame),
-            font=("Roboto Mono", 14),
-            corner_radius=8,
-            fg_color=BTN_BG,
-            text_color=HEADER_COLOR,
-            border_width=1,
-            border_color="#4A4A4A"
-        )
-        back_button.place(relx=0.5, rely=1.0, x=0, y=-10, anchor="s")
 
     def _update_pump_assignment(self, pump, chemical):
         self.controller.pump_assignments[pump] = chemical
