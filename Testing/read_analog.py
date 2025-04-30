@@ -93,24 +93,24 @@ class MultiChannelOscilloscope:
         self.update_plot()
     
     def reset_ads(self):
-    global ads1, ads2, channels
-    # Reinitialize I2C and ADS devices
-    i2c.deinit()
-    time.sleep(0.1)
-    i2c = busio.I2C(board.SCL, board.SDA)
-    ads1 = ADS.ADS1115(i2c, address=0x4A)
-    ads2 = ADS.ADS1115(i2c, address=0x4B)
-    # Recreate channels list
-    channels = [
-        AnalogIn(ads1, ADS.P0),
-        AnalogIn(ads1, ADS.P1),
-        AnalogIn(ads1, ADS.P2),
-        AnalogIn(ads1, ADS.P3),
-        AnalogIn(ads2, ADS.P0),
-        AnalogIn(ads2, ADS.P1),
-        AnalogIn(ads2, ADS.P2),
-        AnalogIn(ads2, ADS.P3)
-    ]
+        global ads1, ads2, channels
+        # Reinitialize I2C and ADS devices
+        i2c.deinit()
+        time.sleep(0.1)
+        i2c = busio.I2C(board.SCL, board.SDA)
+        ads1 = ADS.ADS1115(i2c, address=0x4A)
+        ads2 = ADS.ADS1115(i2c, address=0x4B)
+        # Recreate channels list
+        channels = [
+            AnalogIn(ads1, ADS.P0),
+            AnalogIn(ads1, ADS.P1),
+            AnalogIn(ads1, ADS.P2),
+            AnalogIn(ads1, ADS.P3),
+            AnalogIn(ads2, ADS.P0),
+            AnalogIn(ads2, ADS.P1),
+            AnalogIn(ads2, ADS.P2),
+            AnalogIn(ads2, ADS.P3)
+        ]
 
 def update_plot(self):
     current_time = time.monotonic() - self.time_offset
