@@ -91,19 +91,43 @@ class MultiChannelOscilloscope:
 
         # Start updates
         self.update_plot()
+    
+    def reset_ads(self):
+    global ads1, ads2, channels
+    # Reinitialize I2C and ADS devices
+    i2c.deinit()
+    time.sleep(0.1)
+    i2c = busio.I2C(board.SCL, board.SDA)
+    ads1 = ADS.ADS1115(i2c, address=0x4A)
+    ads2 = ADS.ADS1115(i2c, address=0x4B)
+    # Recreate channels list
+    channels = [
+        AnalogIn(ads1, ADS.P0),
+        AnalogIn(ads1, ADS.P1),
+        AnalogIn(ads1, ADS.P2),
+        AnalogIn(ads1, ADS.P3),
+        AnalogIn(ads2, ADS.P0),
+        AnalogIn(ads2, ADS.P1),
+        AnalogIn(ads2, ADS.P2),
+        AnalogIn(ads2, ADS.P3)
+    ]
 
-    def update_plot(self):
-        current_time = time.monotonic() - self.time_offset
-        
-        for i, chan in enumerate(channels):
-            # Read and store data
+def update_plot(self):
+    current_time = time.monotonic() - self.time_offset
+    
+    for i, chan in enumerate(channels):
+        try:
             voltage = chan.voltage
-            self.x_data[i].append(current_time)
-            self.y_data[i].append(voltage)
-            
-            # Update displays
-            self.voltage_vars[i].set(f"Ch{i}: {voltage:.3f} V")
-            self.lines[i].set_data(self.x_data[i], self.y_data[i])
+        except OSError:
+            # Handle I2C errors by resetting the ADC connection
+            print(f"I2C error on channel {i}, reinitializing...")
+            self.reset_ads()
+            return  # Skip this update cycle
+
+        self.x_data[i].append(current_time)
+        self.y_data[i].append(voltage)
+        self.voltage_vars[i].set(f"Ch{i}: {voltage:.3f} V")
+        self.lines[i].set_data(self.x_data[i], self.y_data[i])
 
         # Adjust viewport
         if current_time > self.ax.get_xlim()[1]:
