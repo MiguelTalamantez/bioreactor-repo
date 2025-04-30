@@ -15,8 +15,8 @@ ads.gain = 1  # ±4.096V range
 
 # Initialize all four input channels
 channels = [
-    AnalogIn(ads, ADS.P0),
-    AnalogIn(ads, ADS.P1),
+    # AnalogIn(ads, ADS.P0),
+    # # AnalogIn(ads, ADS.P1),
     AnalogIn(ads, ADS.P2),
     AnalogIn(ads, ADS.P3)
 ]
