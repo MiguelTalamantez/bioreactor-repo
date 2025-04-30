@@ -1,8 +1,8 @@
 import time
 import board
 import busio
-import Adafruit-ADS1x15.ads1115 as ADS
-from Adafruit-ADS1x15.analog_in import AnalogIn
+import ADS1x15.ads1115 as ADS
+from ADS1x15.analog_in import AnalogIn
 import tkinter as tk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
