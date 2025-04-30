@@ -8,17 +8,27 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from collections import deque
 
-# Set up ADC with all four channels
+# Set up I2C bus
 i2c = busio.I2C(board.SCL, board.SDA)
-ads = ADS.ADS1115(i2c)
-ads.gain = 1  # ±4.096V range
 
-# Initialize all four input channels
+# Initialize both ADS1115 devices
+ads1 = ADS.ADS1115(i2c, address=0x4A)  # First multiplexer
+ads2 = ADS.ADS1115(i2c, address=0x4B)  # Second multiplexer
+ads1.gain = ads2.gain = 1  # ±4.096V range for both
+
+# Initialize all 8 input channels (4 per ADS1115)
 channels = [
-    # AnalogIn(ads, ADS.P0),
-    # # AnalogIn(ads, ADS.P1),
-    AnalogIn(ads, ADS.P2),
-    AnalogIn(ads, ADS.P3)
+    # First ADS1115 (0x4A)
+    AnalogIn(ads1, ADS.P0),
+    AnalogIn(ads1, ADS.P1),
+    AnalogIn(ads1, ADS.P2),
+    AnalogIn(ads1, ADS.P3),
+    
+    # Second ADS1115 (0x4B)
+    AnalogIn(ads2, ADS.P0),
+    AnalogIn(ads2, ADS.P1),
+    AnalogIn(ads2, ADS.P2),
+    AnalogIn(ads2, ADS.P3)
 ]
 
 # Oscilloscope settings
@@ -34,41 +44,46 @@ class MultiChannelOscilloscope:
         self.label_frame = tk.Frame(master)
         self.label_frame.pack(pady=10)
         
-        # Initialize voltage display variables
-        self.voltage_vars = [tk.StringVar() for _ in range(4)]
+        # Initialize voltage display variables for 8 channels
+        self.voltage_vars = [tk.StringVar() for _ in range(8)]
         self.voltage_labels = []
-        colors = ['#0000FF', '#009900', '#FF0000', '#990099']
+        colors = ['#0000FF', '#009900', '#FF0000', '#990099',
+                  '#FFA500', '#00FFFF', '#FF00FF', '#A52A2A']
         
-        for i in range(4):
+        # Create two rows of labels for better organization
+        for i in range(8):
             self.voltage_vars[i].set(f"Ch{i}: -- V")
             lbl = tk.Label(
                 self.label_frame,
                 textvariable=self.voltage_vars[i],
-                font=("Arial", 14),
+                font=("Arial", 12),
                 fg=colors[i]
             )
-            lbl.grid(row=0, column=i, padx=15)
+            row = 0 if i < 4 else 1
+            col = i % 4
+            lbl.grid(row=row, column=col, padx=10, pady=5)
             self.voltage_labels.append(lbl)
 
         # Initialize data buffers for all channels
-        self.x_data = [deque(maxlen=MAX_DATA_POINTS) for _ in range(4)]
-        self.y_data = [deque(maxlen=MAX_DATA_POINTS) for _ in range(4)]
+        self.x_data = [deque(maxlen=MAX_DATA_POINTS) for _ in range(8)]
+        self.y_data = [deque(maxlen=MAX_DATA_POINTS) for _ in range(8)]
         self.time_offset = time.monotonic()
 
         # Create figure and axis
-        self.fig = Figure(figsize=(8, 4), dpi=100)
+        self.fig = Figure(figsize=(10, 6), dpi=100)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_ylim(0, 4.096)  # Matches ADC gain setting
         self.ax.set_xlim(0, 10)
         self.ax.grid(True)
 
         # Create plot lines for each channel
-        colors = ['blue', 'green', 'red', 'purple']
+        colors = ['blue', 'green', 'red', 'purple',
+                  'orange', 'cyan', 'magenta', 'brown']
         self.lines = [
             self.ax.plot([], [], c=color, label=f'Sensor {i}')[0]
             for i, color in enumerate(colors)
         ]
-        self.ax.legend(loc='upper right')
+        self.ax.legend(loc='upper right', ncols=2)
 
         # Create canvas
         self.canvas = FigureCanvasTkAgg(self.fig, master=master)
@@ -101,6 +116,5 @@ class MultiChannelOscilloscope:
 # Create and run application
 root = tk.Tk()
 app = MultiChannelOscilloscope(root)
-root.geometry("800x600")
+root.geometry("1000x800")
 root.mainloop()
-
