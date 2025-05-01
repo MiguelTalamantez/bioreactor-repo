@@ -97,9 +97,9 @@ class MultiChannelOscilloscope:
             time.sleep(0.5)  # Longer delay for hardware reset
             i2c = busio.I2C(board.SCL, board.SDA)
             
-            ads1 = ADS.ADS1115(i2c, address=0x4A)
-            ads2 = ADS.ADS1115(i2c, address=0x4B)
-            ads3 = ADS.ADS1115(i2c, address=0x49)  # New device
+            ads1 = ADS.ADS1115(i2c, address=0x48)
+            ads2 = ADS.ADS1115(i2c, address=0x4A)
+            ads3 = ADS.ADS1115(i2c, address=0x4B)
             ads1.gain = ads2.gain = ads3.gain = 1
             
             channels = [
