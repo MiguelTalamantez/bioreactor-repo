@@ -16,9 +16,9 @@ logging.basicConfig(filename='bioreactor_errors.log', level=logging.ERROR)
 i2c = busio.I2C(board.SCL, board.SDA)
 
 # Initialize three ADS1115 devices (update addresses if needed)
-ads1 = ADS.ADS1115(i2c, address=0x4A)  # First multiplexer
-ads2 = ADS.ADS1115(i2c, address=0x4B)  # Second multiplexer
-ads3 = ADS.ADS1115(i2c, address=0x49)  # Third multiplexer (new)
+ads1 = ADS.ADS1115(i2c, address=0x48)  
+ads2 = ADS.ADS1115(i2c, address=0x4A)
+ads3 = ADS.ADS1115(i2c, address=0x4B)  
 ads1.gain = ads2.gain = ads3.gain = 1  # ±4.096V range for all
 
 # Initialize all 12 input channels (4 per ADS1115)
