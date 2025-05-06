@@ -25,6 +25,9 @@ class BioreactorMonitor:
         self.channels = []
         self.data_lock = threading.Lock()
         self.running = True
+        self.x_data = [deque(maxlen=50) for _ in range(12)]
+        self.y_data = [deque(maxlen=50) for _ in range(12)]
+        self.time_offset = time.monotonic()
         self.init_ads()
 
     def init_ads(self, retries=3):
@@ -34,7 +37,7 @@ class BioreactorMonitor:
                 if self.i2c:
                     self.i2c.deinit()
                 
-                self.i2c = busio.I2C(board.SCL, board.SDA, timeout=0.1)
+                self.i2c = busio.I2C(board.SCL, board.SDA)  # timeout removed
                 self.ads_devices = [
                     ADS.ADS1115(self.i2c, address=addr) for addr in (0x48, 0x4A, 0x4B)
                 ]
@@ -80,10 +83,9 @@ class MultiChannelOscilloscope:
         self.master.title("Bioreactor Monitoring System v3.1")
         self.monitor = BioreactorMonitor()
         
-        # Initialize data structures
-        self.time_offset = time.monotonic()
-        self.x_data = [deque(maxlen=50) for _ in range(12)]
-        self.y_data = [deque(maxlen=50) for _ in range(12)]
+        # For easier access in update_plot
+        self.x_data = self.monitor.x_data
+        self.y_data = self.monitor.y_data
         
         # Start sensor thread
         self.sensor_thread = threading.Thread(
@@ -153,9 +155,10 @@ class MultiChannelOscilloscope:
                         self.lines[i].set_data(self.x_data[i], self.y_data[i])
             
             # Adjust viewport
-            current_time = time.monotonic() - self.time_offset
-            if current_time > self.ax.get_xlim()[1]:
-                self.ax.set_xlim(current_time - 10, current_time)
+            if self.x_data[0]:
+                current_time = self.x_data[0][-1]
+                if current_time > self.ax.get_xlim()[1]:
+                    self.ax.set_xlim(current_time - 10, current_time)
             
             self.canvas.draw()
             
