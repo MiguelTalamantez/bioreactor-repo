@@ -40,7 +40,12 @@ class EnhancedKPMP10PumpController:
         }
         self.stir_pin = 36
         self.led_pins = {'OD': 11, 'pH': 13, 'DO': 15}
-        GPIO.setmode(GPIO.BOARD)
+        
+        try:
+            GPIO.setmode(GPIO.BOARD)
+        except ValueError:
+            pass  # Already set mode, continue
+        
         self._setup_hardware()
 
     def _setup_hardware(self):
@@ -722,9 +727,13 @@ class DeveloperFrame(ctk.CTkFrame):
         back_button.place(relx=0.5, rely=1.0, x=0, y=-10, anchor="s")
 
 if __name__ == "__main__":
+    app = None
     try:
         app = App()
         app.mainloop()
+    except Exception as e:
+        print(f"Application error: {str(e)}")
     finally:
-        if hasattr(app.frames.get("DeveloperFrame", None), "pump_controller"):
+        if app and hasattr(app.frames.get("DeveloperFrame", None), "pump_controller"):
             app.frames["DeveloperFrame"].pump_controller.cleanup()
+        GPIO.cleanup()  # Ensure cleanup even if initialization fails
