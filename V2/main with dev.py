@@ -25,43 +25,47 @@ BG_MED = "#2b2b2b"
 BTN_BG = "#404040"
 DEV_COLOR = "#8E44AD"
 
-class KPMP10PumpController:
-    def __init__(self, step_pin=STEP_PIN, dir_pin=DIR_PIN):
-        self.step_pin = step_pin
-        self.dir_pin = dir_pin
-        self.running = False
-        self.thread = None
+class EnhancedKPMP10PumpController:
+    def __init__(self, pump_config):
+        self.pumps = {
+            1: {'step': 19, 'dir': 21},
+            2: {'step': 31, 'dir': 29},
+            3: {'step': 40, 'dir': 37},
+            4: {'step': 35, 'dir': 33}
+        }
+        self.stir_pin = 36
+        self.led_pins = {'OD': 11, 'pH': 13, 'DO': 15}
         GPIO.setmode(GPIO.BOARD)
-        GPIO.setwarnings(False)
-        GPIO.setup(self.step_pin, GPIO.OUT)
-        GPIO.setup(self.dir_pin, GPIO.OUT)
-
-    def run(self, direction=1, steps=200, speed=0.001):
-        if self.running:
-            return
-        self.running = True
-        GPIO.output(self.dir_pin, direction)
+        self._setup_hardware()
         
-        def worker():
-            for _ in range(steps):
-                if not self.running:
-                    break
-                GPIO.output(self.step_pin, 1)
-                time.sleep(speed)
-                GPIO.output(self.step_pin, 0)
-                time.sleep(speed)
-            self.running = False
-            
-        self.thread = threading.Thread(target=worker, daemon=True)
-        self.thread.start()
-
-    def stop(self):
-        self.running = False
-        if self.thread:
-            self.thread.join(timeout=1)
-
+    def _setup_hardware(self):
+        GPIO.setwarnings(False)
+        for p in self.pumps.values():
+            GPIO.setup(p['step'], GPIO.OUT)
+            GPIO.setup(p['dir'], GPIO.OUT)
+        GPIO.setup(self.stir_pin, GPIO.OUT)
+        self.pwm = GPIO.PWM(self.stir_pin, 60)
+        self.pwm.start(0)
+        for pin in self.led_pins.values():
+            GPIO.setup(pin, GPIO.OUT)
+    
+    def pump_action(self, pump_num, direction, steps=200, speed=0.001):
+        p = self.pumps[pump_num]
+        GPIO.output(p['dir'], direction)
+        for _ in range(steps):
+            GPIO.output(p['step'], 1)
+            time.sleep(speed)
+            GPIO.output(p['step'], 0)
+            time.sleep(speed)
+    
+    def set_stir_speed(self, speed):
+        self.pwm.ChangeDutyCycle(speed)
+    
+    def led_control(self, led_name, state):
+        GPIO.output(self.led_pins[led_name], state)
+    
     def cleanup(self):
-        self.stop()
+        self.pwm.stop()
         GPIO.cleanup()
 
 class App(ctk.CTk):
@@ -102,7 +106,6 @@ class App(ctk.CTk):
 
         button_container = ctk.CTkFrame(nav_frame, fg_color="transparent")
         button_container.pack(expand=True)
-
         buttons = [
             ("pH", "pHFrame"),
             ("Dissolved O₂", "DOFrame"),
@@ -450,7 +453,7 @@ class SetupFrame(ctk.CTkFrame):
         new_name = self.process_entry.get()
         if new_name != self.controller.process_name:
             self.controller.process_name = new_name
-            print(f"Process name updated to: {self.controller.process_name}")
+            print(f"Process name updated to: {new_name}")
             self.controller._update_all_process_controls()
 
     def _create_pump_assignment_ui(self):
@@ -533,99 +536,97 @@ class DeveloperFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=BG_DARK)
         self.controller = controller
-        self.kpmp10 = KPMP10PumpController()
+        self.pump_controller = EnhancedKPMP10PumpController({})
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self._create_pump_controls()
+        self._create_stir_controls()
         self._create_led_controls()
-        self._create_motor_controls()
         self._create_back_button()
 
     def _create_pump_controls(self):
         pump_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         pump_frame.pack(pady=10, padx=10, fill="x")
-        ctk.CTkLabel(pump_frame, text="Pump Controls",
-                   font=("Roboto Mono", 16, "bold"),
-                   text_color=HEADER_COLOR).pack(pady=5)
         
-        for pump in self.controller.pump_assignments:
-            pump_row = ctk.CTkFrame(pump_frame, fg_color="transparent")
-            pump_row.pack(fill="x", pady=2, padx=10)
-            ctk.CTkLabel(pump_row, text=f"{pump}:",
-                       font=("Roboto Mono", 14),
-                       text_color=LABEL_COLOR).pack(side="left")
+        ctk.CTkLabel(pump_frame, text="Pump Controls",
+                   font=("Roboto Mono", 16, "bold")).pack(pady=5)
+        
+        for pump_num in range(1, 5):
+            row = ctk.CTkFrame(pump_frame, fg_color="transparent")
+            row.pack(fill="x", pady=2, padx=10)
             
-            btn_frame = ctk.CTkFrame(pump_row, fg_color="transparent")
+            ctk.CTkLabel(row, text=f"Pump {pump_num}:",
+                       font=("Roboto Mono", 14)).pack(side="left")
+            
+            btn_frame = ctk.CTkFrame(row, fg_color="transparent")
             btn_frame.pack(side="right")
             
-            ctk.CTkButton(btn_frame, text="▶",
-                        command=lambda p=pump: self._pump_action(p, "RIGHT"),
-                        width=40,
-                        fg_color=DEV_COLOR).pack(side="left", padx=2)
+            ctk.CTkButton(btn_frame, text="◀ LEFT",
+                        command=lambda n=pump_num: self._run_pump(n, 0),
+                        width=50).pack(side="left", padx=2)
             
-            ctk.CTkButton(btn_frame, text="◀",
-                        command=lambda p=pump: self._pump_action(p, "LEFT"),
-                        width=40,
-                        fg_color=DEV_COLOR).pack(side="left", padx=2)
+            ctk.CTkButton(btn_frame, text="▶ RIGHT",
+                        command=lambda n=pump_num: self._run_pump(n, 1),
+                        width=50).pack(side="left", padx=2)
             
-            ctk.CTkButton(btn_frame, text="⏹",
-                        command=lambda p=pump: self._pump_action(p, "STOP"),
-                        width=40,
-                        fg_color=CURRENT_WARN_COLOR).pack(side="left", padx=2)
+            ctk.CTkButton(btn_frame, text="⏹ STOP",
+                        command=lambda n=pump_num: self._stop_pump(n),
+                        width=50).pack(side="left", padx=2)
 
-    def _pump_action(self, pump, action):
-        if pump == "Pump 1":
-            if action == "RIGHT":
-                self.kpmp10.run(direction=1)
-            elif action == "LEFT":
-                self.kpmp10.run(direction=0)
-            elif action == "STOP":
-                self.kpmp10.stop()
+    def _create_stir_controls(self):
+        stir_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
+        stir_frame.pack(pady=10, padx=10, fill="x")
         
-        self.controller.device_states["pumps"][pump] = action
-        print(f"{pump} {action}")
+        ctk.CTkLabel(stir_frame, text="Stirring Control",
+                   font=("Roboto Mono", 16, "bold")).pack(pady=5)
+        
+        self.speed_slider = ctk.CTkSlider(stir_frame, from_=0, to=100,
+                                        command=self._set_stir_speed)
+        self.speed_slider.pack(pady=5, padx=10, fill="x")
+        
+        ctk.CTkButton(stir_frame, text="Stop Stirring",
+                    command=lambda: self.pump_controller.set_stir_speed(0),
+                    width=120).pack(pady=5)
 
     def _create_led_controls(self):
         led_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         led_frame.pack(pady=10, padx=10, fill="x")
-        ctk.CTkLabel(led_frame, text="LED Control",
-                   font=("Roboto Mono", 16, "bold"),
-                   text_color=HEADER_COLOR).pack(pady=5)
+        
+        ctk.CTkLabel(led_frame, text="LED Controls",
+                   font=("Roboto Mono", 16, "bold")).pack(pady=5)
+        
         btn_frame = ctk.CTkFrame(led_frame, fg_color="transparent")
         btn_frame.pack()
-        self.led_button = ctk.CTkButton(btn_frame, text="LED: OFF",
-                                      command=self._toggle_led,
-                                      fg_color=DEV_COLOR)
-        self.led_button.pack(pady=5)
+        
+        self.led_buttons = {}
+        for led in ['OD', 'pH', 'DO']:
+            btn = ctk.CTkButton(btn_frame, text=f"{led} LED: OFF",
+                              command=lambda l=led: self._toggle_led(l),
+                              width=100)
+            btn.pack(side="left", padx=5)
+            self.led_buttons[led] = btn
 
-    def _toggle_led(self):
-        current_state = self.controller.device_states["led"]
-        new_state = "OFF" if current_state == "ON" else "ON"
-        self.controller.device_states["led"] = new_state
-        self.led_button.configure(text=f"LED: {new_state}")
-        print(f"LED {new_state}")
+    def _toggle_led(self, led_name):
+        current_state = GPIO.input(self.pump_controller.led_pins[led_name])
+        new_state = not current_state
+        self.pump_controller.led_control(led_name, new_state)
+        self.led_buttons[led_name].configure(
+            text=f"{led_name} LED: {'ON' if new_state else 'FAIL' if new_state is None else 'OFF'}",
+            fg_color=DEV_COLOR if new_state else BTN_BG
+        )
 
-    def _create_motor_controls(self):
-        motor_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
-        motor_frame.pack(pady=10, padx=10, fill="x")
-        ctk.CTkLabel(motor_frame, text="Motor Control",
-                   font=("Roboto Mono", 16, "bold"),
-                   text_color=HEADER_COLOR).pack(pady=5)
-        btn_frame = ctk.CTkFrame(motor_frame, fg_color="transparent")
-        btn_frame.pack()
-        ctk.CTkButton(btn_frame, text="◀ LEFT",
-                    command=lambda: self._motor_action("LEFT"),
-                    fg_color=DEV_COLOR).pack(side="left", padx=2)
-        ctk.CTkButton(btn_frame, text="⏹ STOP",
-                    command=lambda: self._motor_action("STOP"),
-                    fg_color=CURRENT_WARN_COLOR).pack(side="left", padx=2)
-        ctk.CTkButton(btn_frame, text="RIGHT ▶",
-                    command=lambda: self._motor_action("RIGHT"),
-                    fg_color=DEV_COLOR).pack(side="left", padx=2)
+    def _run_pump(self, pump_num, direction):
+        threading.Thread(
+            target=self.pump_controller.pump_action,
+            args=(pump_num, direction),
+            daemon=True
+        ).start()
 
-    def _motor_action(self, action):
-        self.controller.device_states["motor"] = action
-        print(f"Motor {action}")
+    def _stop_pump(self, pump_num):
+        pass  # Add interrupt logic if needed
+
+    def _set_stir_speed(self, speed):
+        self.pump_controller.set_stir_speed(float(speed))
 
     def _create_back_button(self):
         back_button = ctk.CTkButton(
@@ -644,5 +645,5 @@ if __name__ == "__main__":
         app = App()
         app.mainloop()
     finally:
-        if hasattr(app.frames.get("DeveloperFrame", None), "kpmp10"):
-            app.frames["DeveloperFrame"].kpmp10.cleanup()
+        if hasattr(app.frames.get("DeveloperFrame", None), "pump_controller"):
+            app.frames["DeveloperFrame"].pump_controller.cleanup()
