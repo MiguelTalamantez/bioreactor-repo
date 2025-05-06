@@ -8,6 +8,11 @@ from matplotlib.figure import Figure
 import RPi.GPIO as GPIO
 import threading
 import time
+import board
+import busio
+import adafruit_ads1x15.ads1115 as ADS
+from adafruit_ads1x15.analog_in import AnalogIn
+import logging
 
 # Hardware Constants
 STEP_PIN = 19
@@ -37,7 +42,7 @@ class EnhancedKPMP10PumpController:
         self.led_pins = {'OD': 11, 'pH': 13, 'DO': 15}
         GPIO.setmode(GPIO.BOARD)
         self._setup_hardware()
-        
+
     def _setup_hardware(self):
         GPIO.setwarnings(False)
         for p in self.pumps.values():
@@ -539,10 +544,86 @@ class DeveloperFrame(ctk.CTkFrame):
         self.pump_controller = EnhancedKPMP10PumpController({})
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
+        self.analog_running = False
+        self.ads_devices = []
+        self.channels = []
+        
+        try:
+            # Initialize ADS1115 devices
+            i2c = busio.I2C(board.SCL, board.SDA)
+            self.ads_devices = [
+                ADS.ADS1115(i2c, address=addr) for addr in (0x48, 0x4A, 0x4B)
+            ]
+            for ads in self.ads_devices:
+                ads.gain = 1
+            self.channels = [
+                AnalogIn(ads, pin)
+                for ads in self.ads_devices
+                for pin in (ADS.P0, ADS.P1, ADS.P2, ADS.P3)
+            ]
+        except Exception as e:
+            logging.error(f"Failed to initialize ADS1115: {str(e)}")
+        
         self._create_pump_controls()
         self._create_stir_controls()
         self._create_led_controls()
+        self._create_analog_controls()
         self._create_back_button()
+
+    def _create_analog_controls(self):
+        analog_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
+        analog_frame.pack(pady=10, padx=10, fill="x")
+        
+        ctk.CTkLabel(analog_frame, text="Analog Collection",
+                   font=("Roboto Mono", 16, "bold")).pack(pady=5)
+        
+        self.analog_switch = ctk.CTkSwitch(
+            analog_frame,
+            text="Collect Analog (OFF)",
+            command=self._toggle_analog,
+            font=("Roboto Mono", 14),
+            progress_color=DEV_COLOR
+        )
+        self.analog_switch.pack(side="left", padx=10, pady=5)
+        
+        self.analog_data = ctk.CTkTextbox(
+            analog_frame,
+            height=100,
+            font=("Roboto Mono", 12),
+            fg_color=BG_DARK,
+            text_color=LABEL_COLOR
+        )
+        self.analog_data.pack(fill="x", padx=10, pady=5)
+
+    def _toggle_analog(self):
+        self.analog_running = not self.analog_running
+        state = "ON" if self.analog_running else "OFF"
+        self.analog_switch.configure(text=f"Collect Analog ({state})")
+        
+        if self.analog_running:
+            self.analog_data.delete("1.0", "end")
+            self.analog_thread = threading.Thread(
+                target=self._read_analog,
+                daemon=True
+            )
+            self.analog_thread.start()
+        else:
+            self.after_cancel(self.analog_update_id)
+
+    def _read_analog(self):
+        while self.analog_running:
+            try:
+                voltages = [f"{chan.voltage:.4f}V" for chan in self.channels]
+                data_str = " | ".join(voltages) + "\n"
+                self.after(0, self._update_analog_display, data_str)
+                time.sleep(0.5)
+            except Exception as e:
+                logging.error(f"Analog read error: {str(e)}")
+                break
+
+    def _update_analog_display(self, data):
+        self.analog_data.insert("end", data)
+        self.analog_data.see("end")
 
     def _create_pump_controls(self):
         pump_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
@@ -623,7 +704,7 @@ class DeveloperFrame(ctk.CTkFrame):
         ).start()
 
     def _stop_pump(self, pump_num):
-        pass  # Add interrupt logic if needed
+        pass
 
     def _set_stir_speed(self, speed):
         self.pump_controller.set_stir_speed(float(speed))
