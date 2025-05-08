@@ -757,9 +757,11 @@ class DeveloperFrame(ctk.CTkFrame):
         back_button.place(relx=0.5, rely=1.0, x=0, y=-10, anchor="s")
 
 if __name__ == "__main__":
+    app = None  # Initialize app variable outside try block
     try:
         app = App()
         app.mainloop()
     finally:
-        if hasattr(app.frames.get("DeveloperFrame", None), "pump_controller"):
+        # Check if app exists before accessing its properties
+        if app is not None and hasattr(app.frames.get("DeveloperFrame", None), "pump_controller"):
             app.frames["DeveloperFrame"].pump_controller.cleanup()
