@@ -108,7 +108,7 @@ class App(ctk.CTk):
         button_container.pack(expand=True)
         buttons = [
             ("pH", "pHFrame"),
-            ("Dissolved Oâ‚‚", "DOFrame"),
+            ("Dissolved O₂", "DOFrame"),
             ("Optical Density", "ODFrame"),
             ("Temperature", "TempFrame"),
             ("Stirring", "StirringFrame"),
@@ -122,7 +122,7 @@ class App(ctk.CTk):
                 text=text,
                 command=lambda name=frame_name: self.show_frame(name),
                 height=60,
-                font=("Roboto Mono", 20),
+                font=("Roboto Mono", 15),
                 border_width=1,
                 corner_radius=8,
                 fg_color=BTN_BG,
@@ -207,7 +207,7 @@ class ParameterFrame(ctk.CTkFrame):
         self.timer_label = ctk.CTkLabel(
             control_frame,
             text="00:00:00",
-            font=("Roboto Mono", 20, "bold"),
+            font=("Roboto Mono", 14, "bold"),
             text_color=HEADER_COLOR
         )
         self.timer_label.pack(side="left", padx=10)
@@ -216,7 +216,7 @@ class ParameterFrame(ctk.CTkFrame):
             control_frame,
             text="Start Process" if not self.controller.process_active else "Stop Process",
             command=self._toggle_process,
-            font=("Roboto Mono", 20, "bold"),
+            font=("Roboto Mono", 16, "bold"),
             fg_color=CURRENT_OK_COLOR if not self.controller.process_active else CURRENT_WARN_COLOR,
             text_color=BG_DARK,
             width=180,
@@ -264,7 +264,7 @@ class ParameterFrame(ctk.CTkFrame):
         headers = ["Parameter", "Current", "Set", "Units"]
         for col, header in enumerate(headers):
             ctk.CTkLabel(self.status_table_frame, text=header,
-                       font=("Roboto Mono", 20, "bold"),
+                       font=("Roboto Mono", 14, "bold"),
                        text_color=HEADER_COLOR).grid(row=0, column=col, pady=(0, 1), sticky="ew")
         self.status_labels = {}
         for row, (param, values) in enumerate(self.status_data.items(), start=1):
@@ -335,13 +335,13 @@ class pHFrame(ParameterFrame):
                       command=self._add_setpoint,
                       fg_color=BTN_BG,
                       text_color=NAV_TEXT_COLOR,
-                      font=("Roboto Mono", 16),
+                      font=("Roboto Mono", 13),
                       width=100).pack(side="left", padx=2)
         ctk.CTkButton(btn_frame, text="Remove Last",
                       command=self._remove_setpoint,
                       fg_color=BTN_BG,
                       text_color=NAV_TEXT_COLOR,
-                      font=("Roboto Mono", 16),
+                      font=("Roboto Mono", 13),
                       width=100).pack(side="left", padx=2)
 
     def _add_setpoint(self):
@@ -375,8 +375,8 @@ class pHFrame(ParameterFrame):
 class DOFrame(ParameterFrame):
     def __init__(self, parent, controller):
         self.status_data = {
-            "Dissolved Oâ‚‚": {"current": 98.4, "set": 95.0, "units": "%"},
-            "Oâ‚‚ Flow": {"current": 2.5, "set": 2.8, "units": "L/min"}
+            "Dissolved O₂": {"current": 98.4, "set": 95.0, "units": "%"},
+            "O₂ Flow": {"current": 2.5, "set": 2.8, "units": "L/min"}
         }
         super().__init__(parent, controller)
 
@@ -390,7 +390,7 @@ class ODFrame(ParameterFrame):
 class TempFrame(ParameterFrame):
     def __init__(self, parent, controller):
         self.status_data = {
-            "Temperature": {"current": 37.2, "set": 37.0, "units": "Â°C"}
+            "Temperature": {"current": 37.2, "set": 37.0, "units": "°C"}
         }
         super().__init__(parent, controller)
 
@@ -417,6 +417,22 @@ class SetupFrame(ctk.CTkFrame):
         self._create_process_settings()
         self._create_pump_assignment_ui()
         self._add_dev_button()
+        self._add_save_data_button()
+
+    def _add_save_data_button(self):
+        save_button = ctk.CTkButton(
+            self,
+            text="Save Data",
+            command=self._save_data,
+            font=("Roboto Mono", 14),
+            corner_radius=8,
+            fg_color=BTN_BG,
+            text_color=HEADER_COLOR
+        )
+        save_button.place(relx=1.0, rely=1.0, x=-10, y=-60, anchor="se")
+
+    def _save_data(self):
+        pass  # No functionality implemented
 
     def _add_dev_button(self):
         dev_button = ctk.CTkButton(
@@ -561,15 +577,15 @@ class DeveloperFrame(ctk.CTkFrame):
             btn_frame = ctk.CTkFrame(row, fg_color="transparent")
             btn_frame.pack(side="right")
             
-            ctk.CTkButton(btn_frame, text="â—€ LEFT",
+            ctk.CTkButton(btn_frame, text="◀ LEFT",
                         command=lambda n=pump_num: self._run_pump(n, 0),
                         width=50).pack(side="left", padx=2)
             
-            ctk.CTkButton(btn_frame, text="â–¶ RIGHT",
+            ctk.CTkButton(btn_frame, text="▶ RIGHT",
                         command=lambda n=pump_num: self._run_pump(n, 1),
                         width=50).pack(side="left", padx=2)
             
-            ctk.CTkButton(btn_frame, text="â¹ STOP",
+            ctk.CTkButton(btn_frame, text="⏹ STOP",
                         command=lambda n=pump_num: self._stop_pump(n),
                         width=50).pack(side="left", padx=2)
 
