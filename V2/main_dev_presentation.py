@@ -1,17 +1,12 @@
 import time
 import board
 import busio
-import threading
-import matplotlib
-matplotlib.use("TkAgg")
 import customtkinter as ctk
 import tkinter as tk
-from datetime import timedelta
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.figure import Figure
-import RPi.GPIO as GPIO
+from collections import deque
 import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
+import RPi.GPIO as GPIO
 
 # Hardware Constants
 STEP_PIN = 19
@@ -39,15 +34,9 @@ class EnhancedKPMP10PumpController:
         }
         self.stir_pin = 36
         self.led_pins = {'OD': 11, 'pH': 13, 'DO': 15}
-        
-        # Add exception handling for GPIO mode
-        try:
-            GPIO.setmode(GPIO.BOARD)
-        except ValueError:
-            pass  # Already set elsewhere
-        
+        GPIO.setmode(GPIO.BOARD)
         self._setup_hardware()
-
+        
     def _setup_hardware(self):
         GPIO.setwarnings(False)
         for p in self.pumps.values():
@@ -58,7 +47,7 @@ class EnhancedKPMP10PumpController:
         self.pwm.start(0)
         for pin in self.led_pins.values():
             GPIO.setup(pin, GPIO.OUT)
-
+    
     def pump_action(self, pump_num, direction, steps=200, speed=0.001):
         p = self.pumps[pump_num]
         GPIO.output(p['dir'], direction)
@@ -67,25 +56,129 @@ class EnhancedKPMP10PumpController:
             time.sleep(speed)
             GPIO.output(p['step'], 0)
             time.sleep(speed)
-
+    
     def set_stir_speed(self, speed):
         self.pwm.ChangeDutyCycle(speed)
-
+    
     def led_control(self, led_name, state):
         GPIO.output(self.led_pins[led_name], state)
-
+    
     def cleanup(self):
         self.pwm.stop()
         GPIO.cleanup()
 
+class DataCollectionFrame(ctk.CTkFrame):
+    def __init__(self, parent, controller):
+        super().__init__(parent, fg_color=BG_DARK)
+        self.controller = controller
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        
+        self.i2c = busio.I2C(board.SCL, board.SDA)
+        self.ads_devices = self._initialize_ads1115()
+        self.channels = self._create_analog_channels()
+        self.num_channels = len(self.channels)
+        
+        self.canvas = tk.Canvas(self, bg=BG_DARK, highlightthickness=0)
+        self.canvas.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        self.max_points = 100
+        self.time_data = deque(maxlen=self.max_points)
+        self.voltage_data = [deque(maxlen=self.max_points) for _ in range(self.num_channels)]
+        self.colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
+                      '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
+                      '#bcbd22', '#17becf', '#1a55FF', '#FF1493']
+        
+        self._add_back_button()
+        self.update_interval = 200
+        self.update_plot()
+
+    def _initialize_ads1115(self):
+        devices = []
+        for addr in [0x48, 0x4A, 0x4B]:
+            try:
+                ads = ADS.ADS1115(self.i2c, address=addr)
+                ads.gain = 1
+                devices.append(ads)
+            except Exception:
+                pass
+        return devices
+
+    def _create_analog_channels(self):
+        channels = []
+        for ads in self.ads_devices:
+            for pin in (ADS.P0, ADS.P1, ADS.P2, ADS.P3):
+                channels.append(AnalogIn(ads, pin))
+        return channels
+
+    def _add_back_button(self):
+        back_button = ctk.CTkButton(
+            self,
+            text="Back to Setup",
+            command=lambda: self.controller.show_frame("SetupFrame"),
+            font=("Roboto Mono", 14),
+            corner_radius=8,
+            fg_color=BTN_BG,
+            text_color=HEADER_COLOR
+        )
+        back_button.place(relx=0.5, rely=1.0, x=0, y=-10, anchor="s")
+
+    def update_plot(self):
+        try:
+            voltages = [chan.voltage for chan in self.channels]
+            current_time = time.time()
+            
+            self.time_data.append(current_time)
+            for i in range(self.num_channels):
+                self.voltage_data[i].append(voltages[i])
+            
+            self._draw_graph()
+            
+        except Exception as e:
+            print(f"Data collection error: {e}")
+        
+        self.after(self.update_interval, self.update_plot)
+
+    def _draw_graph(self):
+        self.canvas.delete("all")
+        width = self.canvas.winfo_width()
+        height = self.canvas.winfo_height()
+        
+        margin = 50
+        self.canvas.create_line(margin, margin, margin, height-margin, fill='white')
+        self.canvas.create_line(margin, height-margin, width-margin, height-margin, fill='white')
+        
+        if len(self.time_data) < 2:
+            return
+            
+        time_span = max(20, self.time_data[-1]-self.time_data[0])
+        x_scale = (width - 2*margin) / time_span
+        y_scale = (height - 2*margin) / 4.096
+        
+        for ch in range(self.num_channels):
+            points = []
+            for i, (t, v) in enumerate(zip(self.time_data, self.voltage_data[ch])):
+                x = margin + (t - self.time_data[0]) * x_scale
+                y = height - margin - v * y_scale
+                points.extend([x, y])
+            
+            if len(points) > 2:
+                self.canvas.create_line(
+                    *points, 
+                    fill=self.colors[ch % len(self.colors)], 
+                    width=1, 
+                    smooth=True
+                )
+
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Bioreactor Control v2.1")
+        self.title("Bioreactor Control v3.0")
         self.geometry("800x480")
         self.resizable(False, False)
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("dark-blue")
+
         self.frames = {}
         self.current_frame = None
         self.pump_assignments = {
@@ -105,12 +198,14 @@ class App(ctk.CTk):
             "led": "OFF",
             "motor": "STOP"
         }
+
         self._create_navigation()
         self._create_frames()
 
     def _create_navigation(self):
         nav_frame = ctk.CTkFrame(self, width=150, fg_color=BG_MED)
         nav_frame.pack(side="left", fill="y", ipadx=5)
+
         button_container = ctk.CTkFrame(nav_frame, fg_color="transparent")
         button_container.pack(expand=True)
         buttons = [
@@ -122,13 +217,14 @@ class App(ctk.CTk):
             ("Flow", "FlowFrame"),
             ("Setup", "SetupFrame")
         ]
+
         for text, frame_name in buttons:
             ctk.CTkButton(
                 button_container,
                 text=text,
                 command=lambda name=frame_name: self.show_frame(name),
                 height=60,
-                font=("Roboto Mono", 20),
+                font=("Roboto Mono", 15),
                 border_width=1,
                 corner_radius=8,
                 fg_color=BTN_BG,
@@ -142,10 +238,13 @@ class App(ctk.CTk):
         container.pack(side="right", fill="both", expand=True)
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
-        for F in (pHFrame, DOFrame, ODFrame, TempFrame, StirringFrame, FlowFrame, SetupFrame, DeveloperFrame):
+
+        for F in (pHFrame, DOFrame, ODFrame, TempFrame, StirringFrame, 
+                FlowFrame, SetupFrame, DeveloperFrame, DataCollectionFrame):
             frame = F(container, self)
             self.frames[F.__name__] = frame
             frame.grid(row=0, column=0, sticky="nsew")
+
         self.show_frame("pHFrame")
 
     def show_frame(self, frame_name):
@@ -178,8 +277,9 @@ class App(ctk.CTk):
             self.remaining_time -= 1
             self._update_all_process_controls()
             self.timer_id = self.after(1000, self._tick_timer)
-        elif self.process_active:
-            self.stop_process()
+        else:
+            if self.process_active:
+                self.stop_process()
 
     def _update_all_process_controls(self):
         for frame in self.frames.values():
@@ -198,6 +298,7 @@ class ParameterFrame(ctk.CTkFrame):
     def _create_process_control(self):
         control_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         control_frame.pack(pady=4, padx=4, fill="x")
+
         self.process_text = ctk.CTkLabel(
             control_frame,
             text=f"Process Active: {self.controller.process_name}",
@@ -205,6 +306,7 @@ class ParameterFrame(ctk.CTkFrame):
             text_color=LABEL_COLOR
         )
         self.process_text.pack(side="left", padx=10)
+
         self.timer_label = ctk.CTkLabel(
             control_frame,
             text="00:00:00",
@@ -212,6 +314,7 @@ class ParameterFrame(ctk.CTkFrame):
             text_color=HEADER_COLOR
         )
         self.timer_label.pack(side="left", padx=10)
+
         self.process_button = ctk.CTkButton(
             control_frame,
             text="Start Process" if not self.controller.process_active else "Stop Process",
@@ -417,6 +520,19 @@ class SetupFrame(ctk.CTkFrame):
         self._create_process_settings()
         self._create_pump_assignment_ui()
         self._add_dev_button()
+        self._add_data_collection_button()
+
+    def _add_data_collection_button(self):
+        data_button = ctk.CTkButton(
+            self,
+            text="Data Collection",
+            command=lambda: self.controller.show_frame("DataCollectionFrame"),
+            font=("Roboto Mono", 14),
+            corner_radius=8,
+            fg_color=BTN_BG,
+            text_color=HEADER_COLOR
+        )
+        data_button.place(relx=1.0, rely=1.0, x=-10, y=-110, anchor="se")
 
     def _add_dev_button(self):
         dev_button = ctk.CTkButton(
@@ -539,130 +655,51 @@ class DeveloperFrame(ctk.CTkFrame):
         self.pump_controller = EnhancedKPMP10PumpController({})
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
-        self.addresses = [0x48, 0x4A, 0x4B]
-        self.channels = []
-        self.voltage_data = [[] for _ in range(12)]
-        self.timestamps = []
-        self.start_time = time.time()
-        self.running = False
-        self.data_lock = threading.Lock()
-        self._init_adc()
         self._create_pump_controls()
         self._create_stir_controls()
         self._create_led_controls()
-        self._create_analog_button()
         self._create_back_button()
-
-    def _init_adc(self):
-        try:
-            self.i2c = busio.I2C(board.SCL, board.SDA)
-            for addr in self.addresses:
-                ads = ADS.ADS1115(self.i2c, address=addr)
-                ads.gain = 1
-                for pin in (ADS.P0, ADS.P1, ADS.P2, ADS.P3):
-                    self.channels.append(AnalogIn(ads, pin))
-        except Exception as e:
-            print(f"ADC Init Error: {e}")
-            self.analog_button.configure(state="disabled")
-
-    def _create_analog_button(self):
-        self.analog_button = ctk.CTkButton(
-            self,
-            text="Show Analog Data",
-            command=self._show_analog_graph,
-            font=("Roboto Mono", 14),
-            fg_color=DEV_COLOR,
-            text_color="white"
-        )
-        self.analog_button.place(relx=0.5, rely=0.95, anchor="center")
-
-    def _show_analog_graph(self):
-        if hasattr(self, 'analog_window') and self.analog_window.winfo_exists():
-            return
-        self.analog_window = ctk.CTkToplevel(self)
-        self.analog_window.title("Analog Data Monitor")
-        self.analog_window.geometry("1000x600")
-        self.analog_window.protocol("WM_DELETE_WINDOW", self._close_graph)
-        self.fig = Figure(figsize=(10, 6), dpi=100, facecolor=BG_MED)
-        self.axs = self.fig.subplots(4, 3, sharex=True)
-        self.fig.subplots_adjust(hspace=0.4)
-        self.lines = []
-        for i, ax in enumerate(self.axs.flat):
-            ax.set_facecolor(BG_DARK)
-            ax.set_title(f"Channel {i}", color='white')
-            ax.tick_params(colors='white')
-            for spine in ax.spines.values():
-                spine.set_color('white')
-            line, = ax.plot([], [], color=SET_COLOR)
-            self.lines.append(line)
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.analog_window)
-        self.canvas.get_tk_widget().pack(fill='both', expand=True)
-        self.running = True
-        threading.Thread(target=self._read_adc_data, daemon=True).start()
-        self._update_plot()
-
-    def _read_adc_data(self):
-        while self.running:
-            try:
-                voltages = [chan.voltage for chan in self.channels]
-                with self.data_lock:
-                    self.timestamps.append(time.time() - self.start_time)
-                    for i, v in enumerate(voltages):
-                        self.voltage_data[i].append(v)
-                        if len(self.voltage_data[i]) > 100:
-                            self.voltage_data[i].pop(0)
-                    if len(self.timestamps) > 100:
-                        self.timestamps.pop(0)
-                time.sleep(0.1)
-            except Exception as e:
-                print(f"ADC Read Error: {e}")
-                break
-
-    def _update_plot(self):
-        if self.running and self.analog_window.winfo_exists():
-            with self.data_lock:
-                for i, line in enumerate(self.lines):
-                    line.set_data(self.timestamps, self.voltage_data[i])
-                    self.axs.flat[i].relim()
-                    self.axs.flat[i].autoscale_view()
-            self.canvas.draw_idle()
-            self.analog_window.after(100, self._update_plot)
-
-    def _close_graph(self):
-        self.running = False
-        if hasattr(self, 'analog_window'):
-            self.analog_window.destroy()
 
     def _create_pump_controls(self):
         pump_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         pump_frame.pack(pady=10, padx=10, fill="x")
+        
         ctk.CTkLabel(pump_frame, text="Pump Controls",
                    font=("Roboto Mono", 16, "bold")).pack(pady=5)
+        
         for pump_num in range(1, 5):
             row = ctk.CTkFrame(pump_frame, fg_color="transparent")
             row.pack(fill="x", pady=2, padx=10)
+            
             ctk.CTkLabel(row, text=f"Pump {pump_num}:",
                        font=("Roboto Mono", 14)).pack(side="left")
+            
             btn_frame = ctk.CTkFrame(row, fg_color="transparent")
             btn_frame.pack(side="right")
-            ctk.CTkButton(btn_frame, text="LEFT",
+            
+            ctk.CTkButton(btn_frame, text="◀ LEFT",
                         command=lambda n=pump_num: self._run_pump(n, 0),
                         width=50).pack(side="left", padx=2)
-            ctk.CTkButton(btn_frame, text="RIGHT",
+            
+            ctk.CTkButton(btn_frame, text="▶ RIGHT",
                         command=lambda n=pump_num: self._run_pump(n, 1),
                         width=50).pack(side="left", padx=2)
-            ctk.CTkButton(btn_frame, text="STOP",
+            
+            ctk.CTkButton(btn_frame, text="⏹ STOP",
                         command=lambda n=pump_num: self._stop_pump(n),
                         width=50).pack(side="left", padx=2)
 
     def _create_stir_controls(self):
         stir_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         stir_frame.pack(pady=10, padx=10, fill="x")
+        
         ctk.CTkLabel(stir_frame, text="Stirring Control",
                    font=("Roboto Mono", 16, "bold")).pack(pady=5)
+        
         self.speed_slider = ctk.CTkSlider(stir_frame, from_=0, to=100,
                                         command=self._set_stir_speed)
         self.speed_slider.pack(pady=5, padx=10, fill="x")
+        
         ctk.CTkButton(stir_frame, text="Stop Stirring",
                     command=lambda: self.pump_controller.set_stir_speed(0),
                     width=120).pack(pady=5)
@@ -670,10 +707,13 @@ class DeveloperFrame(ctk.CTkFrame):
     def _create_led_controls(self):
         led_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         led_frame.pack(pady=10, padx=10, fill="x")
+        
         ctk.CTkLabel(led_frame, text="LED Controls",
                    font=("Roboto Mono", 16, "bold")).pack(pady=5)
+        
         btn_frame = ctk.CTkFrame(led_frame, fg_color="transparent")
         btn_frame.pack()
+        
         self.led_buttons = {}
         for led in ['OD', 'pH', 'DO']:
             btn = ctk.CTkButton(btn_frame, text=f"{led} LED: OFF",
@@ -699,7 +739,7 @@ class DeveloperFrame(ctk.CTkFrame):
         ).start()
 
     def _stop_pump(self, pump_num):
-        pass  # Add interrupt logic if needed
+        pass
 
     def _set_stir_speed(self, speed):
         self.pump_controller.set_stir_speed(float(speed))
@@ -708,7 +748,7 @@ class DeveloperFrame(ctk.CTkFrame):
         back_button = ctk.CTkButton(
             self,
             text="Back to Setup",
-            command=lambda: [setattr(self, 'running', False), self.controller.show_frame("SetupFrame")],
+            command=lambda: self.controller.show_frame("SetupFrame"),
             font=("Roboto Mono", 14),
             corner_radius=8,
             fg_color=BTN_BG,
@@ -717,11 +757,9 @@ class DeveloperFrame(ctk.CTkFrame):
         back_button.place(relx=0.5, rely=1.0, x=0, y=-10, anchor="s")
 
 if __name__ == "__main__":
-    app = None
     try:
         app = App()
         app.mainloop()
     finally:
-        if app and hasattr(app.frames.get("DeveloperFrame", None), "pump_controller"):
+        if hasattr(app.frames.get("DeveloperFrame", None), "pump_controller"):
             app.frames["DeveloperFrame"].pump_controller.cleanup()
-            
