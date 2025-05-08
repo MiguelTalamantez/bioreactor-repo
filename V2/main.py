@@ -66,7 +66,7 @@ class App(ctk.CTk):
                 text=text,
                 command=lambda name=frame_name: self.show_frame(name),
                 height=60,
-                font=("Roboto Mono", 15),
+                font=("Roboto Mono", 20),
                 border_width=1,
                 corner_radius=8,
                 fg_color=BTN_BG,
@@ -143,7 +143,7 @@ class ParameterFrame(ctk.CTkFrame):
         self.process_text = ctk.CTkLabel(
             control_frame,
             text=f"Process Active: {self.controller.process_name}",
-            font=("Roboto Mono", 14),
+            font=("Roboto Mono", 20),
             text_color=LABEL_COLOR
         )
         self.process_text.pack(side="left", padx=10)
@@ -151,7 +151,7 @@ class ParameterFrame(ctk.CTkFrame):
         self.timer_label = ctk.CTkLabel(
             control_frame,
             text="00:00:00",
-            font=("Roboto Mono", 14, "bold"),
+            font=("Roboto Mono", 20, "bold"),
             text_color=HEADER_COLOR
         )
         self.timer_label.pack(side="left", padx=10)
@@ -160,7 +160,7 @@ class ParameterFrame(ctk.CTkFrame):
             control_frame,
             text="Start Process" if not self.controller.process_active else "Stop Process",
             command=self._toggle_process,
-            font=("Roboto Mono", 16, "bold"),
+            font=("Roboto Mono", 20, "bold"),
             fg_color=CURRENT_OK_COLOR if not self.controller.process_active else CURRENT_WARN_COLOR,
             text_color=BG_DARK,
             width=180,
@@ -211,7 +211,7 @@ class ParameterFrame(ctk.CTkFrame):
         headers = ["Parameter", "Current", "Set", "Units"]
         for col, header in enumerate(headers):
             ctk.CTkLabel(self.status_table_frame, text=header,
-                       font=("Roboto Mono", 14, "bold"),
+                       font=("Roboto Mono", 20, "bold"),
                        text_color=HEADER_COLOR).grid(row=0, column=col, pady=(0, 1), sticky="ew")
 
         self.status_labels = {}
@@ -292,14 +292,14 @@ class pHFrame(ParameterFrame):
                       command=self._add_setpoint,
                       fg_color=BTN_BG,
                       text_color=NAV_TEXT_COLOR,
-                      font=("Roboto Mono", 13),
+                      font=("Roboto Mono", 16),
                       width=100).pack(side="left", padx=2)
         
         ctk.CTkButton(btn_frame, text="Remove Last",
                       command=self._remove_setpoint,
                       fg_color=BTN_BG,
                       text_color=NAV_TEXT_COLOR,
-                      font=("Roboto Mono", 13),
+                      font=("Roboto Mono", 16),
                       width=100).pack(side="left", padx=2)
 
     def _add_setpoint(self):

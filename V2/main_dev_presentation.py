@@ -128,7 +128,7 @@ class App(ctk.CTk):
                 text=text,
                 command=lambda name=frame_name: self.show_frame(name),
                 height=60,
-                font=("Roboto Mono", 15),
+                font=("Roboto Mono", 20),
                 border_width=1,
                 corner_radius=8,
                 fg_color=BTN_BG,
