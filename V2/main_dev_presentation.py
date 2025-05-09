@@ -13,7 +13,6 @@ import busio
 import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 
-# Use BCM mode (Blinka will set this automatically, but it's safe to set here too)
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
 
@@ -30,8 +29,6 @@ DEV_COLOR = "#8E44AD"
 
 class EnhancedKPMP10PumpController:
     def __init__(self, pump_config=None):
-        # BOARD: 19,21,31,29,40,37,35,33,36,11,13,15
-        # BCM:   10,9,6,5,21,26,19,13,16,17,27,22
         self.pumps = {
             1: {'step': 10, 'dir': 9},
             2: {'step': 6, 'dir': 5},
@@ -92,6 +89,7 @@ class App(ctk.CTk):
             "led": "OFF",
             "motor": "STOP"
         }
+        self.ph_setpoint = 7.0
         self._create_navigation()
         self._create_frames()
     def _create_navigation(self):
@@ -370,6 +368,10 @@ class pHFrame(ParameterFrame):
                    label='Set pH', color=SET_COLOR, linestyle='--')
         if self.live_time and self.live_voltage:
             self.ax.plot(self.live_time, self.live_voltage, color="#FF6666", label="Live pH (V)")
+        # Draw pH setpoint line if set
+        setpoint = getattr(self.controller, "ph_setpoint", None)
+        if setpoint is not None:
+            self.ax.axhline(setpoint, color="#FFD700", linestyle=":", linewidth=2, label="pH Setpoint")
         self.ax.set_xlabel('Time (min)', color='white')
         self.ax.set_ylabel('pH / Voltage', color='white')
         self.ax.legend(facecolor=BG_MED, labelcolor='white')
@@ -462,6 +464,7 @@ class SetupFrame(ctk.CTkFrame):
         self._create_process_settings()
         self._create_pump_assignment_ui()
         self._add_dev_button()
+        self._add_ph_setpoint_input()
     def _add_dev_button(self):
         dev_button = ctk.CTkButton(
             self,
@@ -565,6 +568,26 @@ class SetupFrame(ctk.CTkFrame):
         except ValueError:
             self.shutoff_time_entry.delete(0, "end")
             self.shutoff_time_entry.insert(0, str(self.controller.auto_shutoff_time))
+    def _add_ph_setpoint_input(self):
+        setpoint_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
+        setpoint_frame.pack(pady=10, padx=10, fill="x")
+        ctk.CTkLabel(setpoint_frame, text="pH Setpoint:",
+                   font=("Roboto Mono", 14),
+                   text_color=LABEL_COLOR).pack(side="left", padx=10)
+        self.ph_setpoint_entry = ctk.CTkEntry(setpoint_frame, width=80, font=("Roboto Mono", 14))
+        self.ph_setpoint_entry.pack(side="left", padx=5)
+        self.ph_setpoint_entry.insert(0, str(self.controller.ph_setpoint))
+        self.ph_setpoint_entry.bind("<FocusOut>", self._update_ph_setpoint)
+        self.ph_setpoint_entry.bind("<Return>", self._update_ph_setpoint)
+    def _update_ph_setpoint(self, event=None):
+        try:
+            val = float(self.ph_setpoint_entry.get())
+            self.controller.ph_setpoint = val
+            if "pHFrame" in self.controller.frames:
+                self.controller.frames["pHFrame"]._update_plot()
+        except Exception:
+            self.ph_setpoint_entry.delete(0, "end")
+            self.ph_setpoint_entry.insert(0, str(self.controller.ph_setpoint))
 
 class DeveloperFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
