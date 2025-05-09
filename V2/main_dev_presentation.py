@@ -13,6 +13,9 @@ import busio
 import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 
+GPIO.setmode(GPIO.BOARD)
+GPIO.setwarnings(False)
+
 HEADER_COLOR = "#B0C4DE"
 LABEL_COLOR = "#E0E0E0"
 NAV_TEXT_COLOR = "#D6EAF8"
@@ -24,19 +27,16 @@ BG_MED = "#2b2b2b"
 BTN_BG = "#404040"
 DEV_COLOR = "#8E44AD"
 
-GPIO.setmode(GPIO.BCM)
-GPIO.setwarnings(False)
-
 class EnhancedKPMP10PumpController:
     def __init__(self, pump_config=None):
         self.pumps = {
-            1: {'step': 10, 'dir': 9},
-            2: {'step': 6, 'dir': 5},
-            3: {'step': 21, 'dir': 26},
-            4: {'step': 19, 'dir': 13}
+            1: {'step': 19, 'dir': 21},
+            2: {'step': 31, 'dir': 29},
+            3: {'step': 40, 'dir': 37},
+            4: {'step': 35, 'dir': 33}
         }
-        self.stir_pin = 16
-        self.led_pins = {'OD': 17, 'pH': 27, 'DO': 22}
+        self.stir_pin = 36
+        self.led_pins = {'OD': 11, 'pH': 13, 'DO': 15}
         self._setup_hardware()
     def _setup_hardware(self):
         for p in self.pumps.values():
