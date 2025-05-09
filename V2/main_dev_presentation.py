@@ -389,7 +389,7 @@ class pHFrame(ParameterFrame):
         avg_text = "Raw pH (V): --"
         if self.live_voltage:
             avg_ph = sum(self.live_voltage) / len(self.live_voltage)
-            avg_text = f"Raw pH (V): {avg_ph:.3f}"
+            avg_text = f"Live pH: {self._raw_to_ph(avg_ph):.1f}"
         self.ax.text(0.02, 0.98, avg_text, transform=self.ax.transAxes,
                      fontsize=14, color='white', va='top', ha='left',
                      bbox=dict(facecolor=BG_DARK, edgecolor='none', boxstyle='round,pad=0.3', alpha=0.8))
@@ -474,7 +474,7 @@ class pHFrame(ParameterFrame):
                         short_moving_avg = sum(self._raw_to_ph(v) for v in self.live_voltage[-5:]) / 5 if self.live_voltage else None
                         error = setpoint-short_moving_avg
                         error_sum += error
-                        response = round(0.007 * 1/( abs(error) + 0.1 ),4)
+                        response = round(0.0065 * 1/( abs(error) + 0.1 ),4)
                         print("error")
                         print(error)
                         print("response")
