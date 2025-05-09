@@ -470,7 +470,7 @@ class pHFrame(ParameterFrame):
                         setpoint = getattr(self.controller, "ph_setpoint", None)
                         if avg_ph is not None and setpoint is not None and avg_ph > setpoint:
                             if pump_controller:
-                                pump_controller.pump_action(1, 1, steps=800, speed=0.1)
+                                pump_controller.pump_action(1, 1, steps=800, speed=0.001)
                             else:
                                 break
                         else:
