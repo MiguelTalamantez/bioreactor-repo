@@ -12,6 +12,23 @@ import board
 import busio
 import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
+import customtkinter as ctk
+import tkinter as tk
+from datetime import timedelta
+import matplotlib
+matplotlib.use("TkAgg")
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+import RPi.GPIO as GPIO
+import threading
+import time
+import time
+import board
+import busio
+import tkinter as tk
+from collections import deque
+import adafruit_ads1x15.ads1115 as ADS
+from adafruit_ads1x15.analog_in import AnalogIn
 
 # Hardware Constants
 STEP_PIN = 19
