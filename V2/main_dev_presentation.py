@@ -371,8 +371,7 @@ class pHFrame(ParameterFrame):
             self._update_plot()
 
     def _raw_to_ph(self, raw):
-        # 0.0785 -> 7, so pH = raw * (7/0.0785)
-        return raw * (7 / 0.0785)
+        return raw * (7 / 0.107)
 
     def _update_plot(self):
         self.ax.clear()
