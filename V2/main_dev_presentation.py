@@ -7,6 +7,10 @@ from collections import deque
 import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 import RPi.GPIO as GPIO
+import matplotlib
+matplotlib.use("TkAgg")
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
 
 # Hardware Constants
 STEP_PIN = 19
@@ -765,3 +769,4 @@ if __name__ == "__main__":
         # Check if app exists before accessing its properties
         if app is not None and hasattr(app.frames.get("DeveloperFrame", None), "pump_controller"):
             app.frames["DeveloperFrame"].pump_controller.cleanup()
+            
