@@ -267,7 +267,6 @@ class pHFrame(ParameterFrame):
             "Buffer": {"current": 250, "set": 300, "units": "mM"}
         }
         super().__init__(parent, controller)
-        self._add_average_readout()
         self._add_ph_graph()
         self._add_improved_setpoint_controls()
         self.live_thread = None
@@ -285,16 +284,6 @@ class pHFrame(ParameterFrame):
             self.adc_available = True
         except Exception as e:
             self.adc_available = False
-    def _add_average_readout(self):
-        self.avg_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
-        self.avg_frame.pack(pady=(8, 0), padx=4, fill="x")
-        self.avg_label = ctk.CTkLabel(
-            self.avg_frame,
-            text="Average Live pH: --",
-            font=("Roboto Mono", 20, "bold"),
-            text_color=SET_COLOR
-        )
-        self.avg_label.pack(anchor="w", padx=14, pady=2)
     def _add_ph_graph(self):
         self.graph_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         self.graph_frame.pack(pady=(2, 2), padx=4, fill="both", expand=True)
@@ -382,18 +371,19 @@ class pHFrame(ParameterFrame):
         setpoint = getattr(self.controller, "ph_setpoint", None)
         if setpoint is not None:
             self.ax.axhline(setpoint, color="#FFD700", linestyle=":", linewidth=2, label="pH Setpoint")
+        avg_text = "Average Live pH: --"
+        if self.live_voltage:
+            avg = sum(self.live_voltage) / len(self.live_voltage)
+            avg_text = f"Average Live pH: {avg:.3f}"
+        # Place at axes fraction (0.02, 0.98) for upper left, with white text and a dark background
+        self.ax.text(0.02, 0.98, avg_text, transform=self.ax.transAxes,
+                     fontsize=14, color='white', va='top', ha='left',
+                     bbox=dict(facecolor=BG_DARK, edgecolor='none', boxstyle='round,pad=0.3', alpha=0.8))
         self.ax.set_xlabel('Time (min)', color='white')
         self.ax.set_ylabel('pH / Voltage', color='white')
         self.ax.legend(facecolor=BG_MED, labelcolor='white')
         self.ax.grid(color='#4a4a4a', linestyle='--')
         self.canvas.draw()
-        self._update_average_label()
-    def _update_average_label(self):
-        if self.live_voltage:
-            avg = sum(self.live_voltage)/len(self.live_voltage)
-            self.avg_label.configure(text=f"Average Live pH: {avg:.3f}")
-        else:
-            self.avg_label.configure(text="Average Live pH: --")
     def _toggle_live_ph(self):
         if not self.adc_available:
             self.live_status.configure(text="ADC not found")
