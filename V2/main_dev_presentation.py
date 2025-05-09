@@ -5,13 +5,13 @@ import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
-import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO # type: ignore
 import threading
 import time
-import board
-import busio
-import adafruit_ads1x15.ads1115 as ADS
-from adafruit_ads1x15.analog_in import AnalogIn
+import board # type: ignore
+import busio # type: ignore
+import adafruit_ads1x15.ads1115 as ADS # type: ignore
+from adafruit_ads1x15.analog_in import AnalogIn # type: ignore
 
 HEADER_COLOR = "#B0C4DE"
 LABEL_COLOR = "#E0E0E0"
@@ -24,8 +24,6 @@ BG_MED = "#2b2b2b"
 BTN_BG = "#404040"
 DEV_COLOR = "#8E44AD"
 
-# GPIO.setmode(GPIO.BOARD)
-
 class EnhancedKPMP10PumpController:
     def __init__(self, pump_config=None):
         self.pumps = {
@@ -34,7 +32,7 @@ class EnhancedKPMP10PumpController:
             3: {'step': 40, 'dir': 37},
             4: {'step': 35, 'dir': 33}
         }
-        self.stir_pin = 36
+        self.stir_pin = 38
         self.led_pins = {'OD': 11, 'pH': 13, 'DO': 15}
         self._setup_hardware()
     def _setup_hardware(self):
