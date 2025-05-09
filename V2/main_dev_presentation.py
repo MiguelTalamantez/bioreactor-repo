@@ -262,6 +262,7 @@ class ParameterFrame(ctk.CTkFrame):
 
 class pHFrame(ParameterFrame):
     def __init__(self, parent, controller):
+        self.control_running = threading.Event()  # <-- define before super().__init__()
         self.status_data = {
             "pH": {"current": 6.8, "set": 7.0, "units": ""},
             "Buffer": {"current": 250, "set": 300, "units": "mM"}
