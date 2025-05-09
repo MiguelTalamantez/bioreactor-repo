@@ -8,33 +8,13 @@ from matplotlib.figure import Figure
 import RPi.GPIO as GPIO
 import threading
 import time
+
+# ADC imports
 import board
 import busio
 import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
-import customtkinter as ctk
-import tkinter as tk
-from datetime import timedelta
-import matplotlib
-matplotlib.use("TkAgg")
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.figure import Figure
-import RPi.GPIO as GPIO
-import threading
-import time
-import time
-import board
-import busio
-import tkinter as tk
-from collections import deque
-import adafruit_ads1x15.ads1115 as ADS
-from adafruit_ads1x15.analog_in import AnalogIn
 
-# Hardware Constants
-STEP_PIN = 19
-DIR_PIN = 21
-
-# UI Constants
 HEADER_COLOR = "#B0C4DE"
 LABEL_COLOR = "#E0E0E0"
 NAV_TEXT_COLOR = "#D6EAF8"
@@ -58,7 +38,6 @@ class EnhancedKPMP10PumpController:
         self.led_pins = {'OD': 11, 'pH': 13, 'DO': 15}
         GPIO.setmode(GPIO.BOARD)
         self._setup_hardware()
-        
     def _setup_hardware(self):
         GPIO.setwarnings(False)
         for p in self.pumps.values():
@@ -69,7 +48,6 @@ class EnhancedKPMP10PumpController:
         self.pwm.start(0)
         for pin in self.led_pins.values():
             GPIO.setup(pin, GPIO.OUT)
-    
     def pump_action(self, pump_num, direction, steps=200, speed=0.001):
         p = self.pumps[pump_num]
         GPIO.output(p['dir'], direction)
@@ -78,13 +56,10 @@ class EnhancedKPMP10PumpController:
             time.sleep(speed)
             GPIO.output(p['step'], 0)
             time.sleep(speed)
-    
     def set_stir_speed(self, speed):
         self.pwm.ChangeDutyCycle(speed)
-    
     def led_control(self, led_name, state):
         GPIO.output(self.led_pins[led_name], state)
-    
     def cleanup(self):
         self.pwm.stop()
         GPIO.cleanup()
@@ -97,7 +72,6 @@ class App(ctk.CTk):
         self.resizable(False, False)
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("dark-blue")
-
         self.frames = {}
         self.current_frame = None
         self.pump_assignments = {
@@ -117,14 +91,11 @@ class App(ctk.CTk):
             "led": "OFF",
             "motor": "STOP"
         }
-
         self._create_navigation()
         self._create_frames()
-
     def _create_navigation(self):
         nav_frame = ctk.CTkFrame(self, width=150, fg_color=BG_MED)
         nav_frame.pack(side="left", fill="y", ipadx=5)
-
         button_container = ctk.CTkFrame(nav_frame, fg_color="transparent")
         button_container.pack(expand=True)
         buttons = [
@@ -136,7 +107,6 @@ class App(ctk.CTk):
             ("Flow", "FlowFrame"),
             ("Setup", "SetupFrame")
         ]
-
         for text, frame_name in buttons:
             ctk.CTkButton(
                 button_container,
@@ -151,27 +121,22 @@ class App(ctk.CTk):
                 border_color="#4A4A4A",
                 width=140
             ).pack(fill="x", pady=2, padx=2)
-
     def _create_frames(self):
         container = ctk.CTkFrame(self, fg_color=BG_DARK)
         container.pack(side="right", fill="both", expand=True)
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
-
         for F in (pHFrame, DOFrame, ODFrame, TempFrame, StirringFrame, FlowFrame, SetupFrame, DeveloperFrame):
             frame = F(container, self)
             self.frames[F.__name__] = frame
             frame.grid(row=0, column=0, sticky="nsew")
-
         self.show_frame("pHFrame")
-
     def show_frame(self, frame_name):
         frame = self.frames[frame_name]
         frame.tkraise()
         if hasattr(frame, "update_process_controls"):
             frame.update_process_controls()
         self.current_frame = frame_name
-
     def start_process(self):
         if not self.process_active:
             self.process_active = True
@@ -180,7 +145,6 @@ class App(ctk.CTk):
                 self._tick_timer()
             self._update_all_process_controls()
             print(f"Process '{self.process_name}' started")
-
     def stop_process(self):
         if self.process_active:
             self.process_active = False
@@ -189,7 +153,6 @@ class App(ctk.CTk):
                 self.timer_id = None
             self._update_all_process_controls()
             print(f"Process '{self.process_name}' stopped")
-
     def _tick_timer(self):
         if self.process_active and self.auto_shutoff_enabled and self.remaining_time > 0:
             self.remaining_time -= 1
@@ -198,7 +161,6 @@ class App(ctk.CTk):
         else:
             if self.process_active:
                 self.stop_process()
-
     def _update_all_process_controls(self):
         for frame in self.frames.values():
             if hasattr(frame, "update_process_controls"):
@@ -212,11 +174,9 @@ class ParameterFrame(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self._create_process_control()
         self._create_condensed_status_table()
-
     def _create_process_control(self):
         control_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         control_frame.pack(pady=4, padx=4, fill="x")
-
         self.process_text = ctk.CTkLabel(
             control_frame,
             text=f"Process Active: {self.controller.process_name}",
@@ -224,7 +184,6 @@ class ParameterFrame(ctk.CTkFrame):
             text_color=LABEL_COLOR
         )
         self.process_text.pack(side="left", padx=10)
-
         self.timer_label = ctk.CTkLabel(
             control_frame,
             text="00:00:00",
@@ -232,7 +191,6 @@ class ParameterFrame(ctk.CTkFrame):
             text_color=HEADER_COLOR
         )
         self.timer_label.pack(side="left", padx=10)
-
         self.process_button = ctk.CTkButton(
             control_frame,
             text="Start Process" if not self.controller.process_active else "Stop Process",
@@ -246,14 +204,12 @@ class ParameterFrame(ctk.CTkFrame):
         )
         self.process_button.pack(side="right", padx=10, pady=2)
         self.update_process_controls()
-
     def _toggle_process(self):
         if self.controller.process_active:
             self.controller.stop_process()
         else:
             self.controller.start_process()
         self.update_process_controls()
-
     def update_process_controls(self):
         self.process_button.configure(
             text="Stop Process" if self.controller.process_active else "Start Process",
@@ -272,7 +228,6 @@ class ParameterFrame(ctk.CTkFrame):
         self.process_text.configure(text=f"Process Active: {self.controller.process_name}")
         if self.controller.process_active and self.controller.auto_shutoff_enabled:
             self.after(1000, self.update_process_controls)
-
     def _create_condensed_status_table(self):
         if not hasattr(self, "status_data"):
             self.status_data = {"Parameter": {"current": 0.0, "set": 0.0, "units": ""}}
@@ -317,22 +272,20 @@ class pHFrame(ParameterFrame):
         super().__init__(parent, controller)
         self._add_ph_graph()
         self._add_improved_setpoint_controls()
-
-        # --- ADC & Data Buffer Initialization ---
-        self.i2c = busio.I2C(board.SCL, board.SDA)
-        self.ads = ADS.ADS1115(self.i2c, address=0x48)
-        self.ads.gain = 1
-        self.chan0 = AnalogIn(self.ads, ADS.P0)
-
-        self.max_points = 100
-        self.time_data = deque(maxlen=self.max_points)
-        self.voltage_data = deque(maxlen=self.max_points)
-        self._start_time = None
-
-        # Start periodic update
-        self.update_interval = 200  # ms
-        self._update_ph_reading()
-
+        self._add_live_ph_button()
+        self.live_thread = None
+        self.live_running = threading.Event()
+        self.live_time = []
+        self.live_voltage = []
+        try:
+            self.i2c = busio.I2C(board.SCL, board.SDA)
+            self.ads = ADS.ADS1115(self.i2c, address=0x48)
+            self.ads.gain = 1
+            self.ph_channel = AnalogIn(self.ads, ADS.P0)
+            self.adc_available = True
+        except Exception as e:
+            print(f"ADC init failed: {e}")
+            self.adc_available = False
     def _add_ph_graph(self):
         self.graph_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         self.graph_frame.pack(pady=(2, 2), padx=4, fill="both", expand=True)
@@ -350,36 +303,17 @@ class pHFrame(ParameterFrame):
         self.set_ph = []
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)
         self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
-
-    def _update_ph_reading(self):
-        import time
-        now = time.time()
-        if self._start_time is None:
-            self._start_time = now
-
-        try:
-            voltage = self.chan0.voltage
-        except Exception as e:
-            print(f"ADC read error: {e}")
-            voltage = 0.0
-
-        self.time_data.append(now - self._start_time)
-        self.voltage_data.append(voltage)
-        self._update_plot()
-        # Schedule next update
-        self.after(self.update_interval, self._update_ph_reading)
-
     def _add_improved_setpoint_controls(self):
         control_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         control_frame.pack(pady=(2, 8), padx=4, fill="x")
         control_frame.grid_columnconfigure(0, weight=1)
         control_frame.grid_columnconfigure(1, weight=1)
         control_frame.grid_columnconfigure(2, weight=1)
-        ctk.CTkLabel(control_frame, text="Time (min):", 
+        ctk.CTkLabel(control_frame, text="Time (min):",
                    font=("Roboto Mono", 13)).grid(row=0, column=0, padx=2, sticky="e")
         self.time_entry = ctk.CTkEntry(control_frame, width=70, font=("Roboto Mono", 13))
         self.time_entry.grid(row=0, column=1, padx=2, sticky="w")
-        ctk.CTkLabel(control_frame, text="Set pH:", 
+        ctk.CTkLabel(control_frame, text="Set pH:",
                    font=("Roboto Mono", 13)).grid(row=0, column=2, padx=2, sticky="e")
         self.ph_entry = ctk.CTkEntry(control_frame, width=70, font=("Roboto Mono", 13))
         self.ph_entry.grid(row=0, column=3, padx=2, sticky="w")
@@ -397,41 +331,94 @@ class pHFrame(ParameterFrame):
                       text_color=NAV_TEXT_COLOR,
                       font=("Roboto Mono", 13),
                       width=100).pack(side="left", padx=2)
-
     def _add_setpoint(self):
         try:
-            time = float(self.time_entry.get())
+            time_val = float(self.time_entry.get())
             ph = float(self.ph_entry.get())
             self.set_ph.append(ph)
-            self.time_points.append(time)
+            self.time_points.append(time_val)
             self._update_plot()
             self.time_entry.delete(0, 'end')
             self.ph_entry.delete(0, 'end')
         except ValueError:
             print("Invalid input values")
-
     def _remove_setpoint(self):
         if len(self.set_ph) > 0:
             self.set_ph.pop()
             self.time_points.pop()
             self._update_plot()
-
     def _update_plot(self):
         self.ax.clear()
-        # Plot setpoints (step plot)
-        if self.time_points and self.set_ph:
-            self.ax.step(self.time_points, self.set_ph, where='post',
-                         label='Set pH', color=SET_COLOR, linestyle='--')
-
-        # Plot live voltage (line plot)
-        if len(self.time_data) > 1:
-            self.ax.plot(self.time_data, self.voltage_data, color='#FF0000', label='pH Voltage (Ch0)')
-
-        self.ax.set_xlabel('Time (s)', color='white')
-        self.ax.set_ylabel('Voltage (V)', color='white')
+        self.ax.step(self.time_points, self.set_ph, where='post',
+                   label='Set pH', color=SET_COLOR, linestyle='--')
+        if self.live_time and self.live_voltage:
+            self.ax.plot(self.live_time, self.live_voltage, color="#FF6666", label="Live pH (V)")
+        self.ax.set_xlabel('Time (min)', color='white')
+        self.ax.set_ylabel('pH / Voltage', color='white')
         self.ax.legend(facecolor=BG_MED, labelcolor='white')
         self.ax.grid(color='#4a4a4a', linestyle='--')
         self.canvas.draw()
+    def _add_live_ph_button(self):
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(pady=(0, 8), padx=4, fill="x")
+        self.live_btn = ctk.CTkButton(
+            btn_frame,
+            text="Start Live pH Read",
+            command=self._toggle_live_ph,
+            fg_color=BTN_BG,
+            text_color=HEADER_COLOR,
+            font=("Roboto Mono", 14),
+            width=180
+        )
+        self.live_btn.pack(side="left", padx=10)
+        self.live_status = ctk.CTkLabel(
+            btn_frame,
+            text="",
+            font=("Roboto Mono", 13),
+            text_color=LABEL_COLOR
+        )
+        self.live_status.pack(side="left", padx=10)
+    def _toggle_live_ph(self):
+        if not self.adc_available:
+            self.live_status.configure(text="ADC not found")
+            return
+        if self.live_running.is_set():
+            self._stop_live_ph()
+        else:
+            self._start_live_ph()
+    def _start_live_ph(self):
+        self.live_running.set()
+        self.live_time = []
+        self.live_voltage = []
+        self.live_start_time = time.time()
+        self.live_btn.configure(text="Stop Live pH Read")
+        self.live_status.configure(text="Reading...")
+        self.live_thread = threading.Thread(target=self._live_ph_loop, daemon=True)
+        self.live_thread.start()
+        self._schedule_plot_update()
+    def _stop_live_ph(self):
+        self.live_running.clear()
+        self.live_btn.configure(text="Start Live pH Read")
+        self.live_status.configure(text="Stopped")
+    def _live_ph_loop(self):
+        while self.live_running.is_set():
+            t = (time.time() - self.live_start_time) / 60.0
+            try:
+                voltage = self.ph_channel.voltage
+            except Exception as e:
+                voltage = 0
+            self.live_time.append(t)
+            self.live_voltage.append(voltage)
+            if len(self.live_time) > 100:
+                self.live_time.pop(0)
+                self.live_voltage.pop(0)
+            time.sleep(0.5)
+    def _schedule_plot_update(self):
+        if self.live_running.is_set():
+            self._update_plot()
+            self.after(500, self._schedule_plot_update)
+        else:
+            self._update_plot()
 
 class DOFrame(ParameterFrame):
     def __init__(self, parent, controller):
@@ -479,7 +466,6 @@ class SetupFrame(ctk.CTkFrame):
         self._create_pump_assignment_ui()
         self._add_dev_button()
         self._add_save_data_button()
-
     def _add_save_data_button(self):
         save_button = ctk.CTkButton(
             self,
@@ -491,10 +477,8 @@ class SetupFrame(ctk.CTkFrame):
             text_color=HEADER_COLOR
         )
         save_button.place(relx=1.0, rely=1.0, x=-10, y=-60, anchor="se")
-
     def _save_data(self):
-        pass  # No functionality implemented
-
+        pass
     def _add_dev_button(self):
         dev_button = ctk.CTkButton(
             self,
@@ -506,7 +490,6 @@ class SetupFrame(ctk.CTkFrame):
             text_color="white"
         )
         dev_button.place(relx=1.0, rely=1.0, x=-10, y=-10, anchor="se")
-
     def _create_process_settings(self):
         settings_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         settings_frame.pack(pady=10, padx=10, fill="x")
@@ -525,14 +508,12 @@ class SetupFrame(ctk.CTkFrame):
         self.process_entry.insert(0, self.controller.process_name)
         self.process_entry.bind("<FocusOut>", self._update_process_name)
         self.process_entry.bind("<Return>", self._update_process_name)
-
     def _update_process_name(self, event=None):
         new_name = self.process_entry.get()
         if new_name != self.controller.process_name:
             self.controller.process_name = new_name
             print(f"Process name updated to: {new_name}")
             self.controller._update_all_process_controls()
-
     def _create_pump_assignment_ui(self):
         main_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         main_frame.pack(pady=10, padx=10, fill="both", expand=True)
@@ -587,22 +568,19 @@ class SetupFrame(ctk.CTkFrame):
         self.shutoff_time_entry.insert(0, str(self.controller.auto_shutoff_time))
         self.shutoff_time_entry.bind("<FocusOut>", self._update_shutoff_time)
         self.shutoff_time_entry.bind("<Return>", self._update_shutoff_time)
-
     def _update_pump_assignment(self, pump, chemical):
         self.controller.pump_assignments[pump] = chemical
         print(f"Updated {pump} to {chemical}")
-
     def _toggle_shutoff(self):
         self.controller.auto_shutoff_enabled = bool(self.shutoff_switch.get())
         print(f"Auto-shutoff enabled: {self.controller.auto_shutoff_enabled}")
         self.controller._update_all_process_controls()
-
     def _update_shutoff_time(self, event=None):
         try:
-            time = int(self.shutoff_time_entry.get())
-            if time > 0:
-                self.controller.auto_shutoff_time = time
-                print(f"Auto-shutoff time set to: {time} min")
+            time_val = int(self.shutoff_time_entry.get())
+            if time_val > 0:
+                self.controller.auto_shutoff_time = time_val
+                print(f"Auto-shutoff time set to: {time_val} min")
             else:
                 raise ValueError
         except ValueError:
@@ -620,61 +598,45 @@ class DeveloperFrame(ctk.CTkFrame):
         self._create_stir_controls()
         self._create_led_controls()
         self._create_back_button()
-
     def _create_pump_controls(self):
         pump_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         pump_frame.pack(pady=10, padx=10, fill="x")
-        
         ctk.CTkLabel(pump_frame, text="Pump Controls",
                    font=("Roboto Mono", 16, "bold")).pack(pady=5)
-        
         for pump_num in range(1, 5):
             row = ctk.CTkFrame(pump_frame, fg_color="transparent")
             row.pack(fill="x", pady=2, padx=10)
-            
             ctk.CTkLabel(row, text=f"Pump {pump_num}:",
                        font=("Roboto Mono", 14)).pack(side="left")
-            
             btn_frame = ctk.CTkFrame(row, fg_color="transparent")
             btn_frame.pack(side="right")
-            
             ctk.CTkButton(btn_frame, text="◀ LEFT",
                         command=lambda n=pump_num: self._run_pump(n, 0),
                         width=50).pack(side="left", padx=2)
-            
             ctk.CTkButton(btn_frame, text="▶ RIGHT",
                         command=lambda n=pump_num: self._run_pump(n, 1),
                         width=50).pack(side="left", padx=2)
-            
             ctk.CTkButton(btn_frame, text="⏹ STOP",
                         command=lambda n=pump_num: self._stop_pump(n),
                         width=50).pack(side="left", padx=2)
-
     def _create_stir_controls(self):
         stir_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         stir_frame.pack(pady=10, padx=10, fill="x")
-        
         ctk.CTkLabel(stir_frame, text="Stirring Control",
                    font=("Roboto Mono", 16, "bold")).pack(pady=5)
-        
         self.speed_slider = ctk.CTkSlider(stir_frame, from_=0, to=100,
                                         command=self._set_stir_speed)
         self.speed_slider.pack(pady=5, padx=10, fill="x")
-        
         ctk.CTkButton(stir_frame, text="Stop Stirring",
                     command=lambda: self.pump_controller.set_stir_speed(0),
                     width=120).pack(pady=5)
-
     def _create_led_controls(self):
         led_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         led_frame.pack(pady=10, padx=10, fill="x")
-        
         ctk.CTkLabel(led_frame, text="LED Controls",
                    font=("Roboto Mono", 16, "bold")).pack(pady=5)
-        
         btn_frame = ctk.CTkFrame(led_frame, fg_color="transparent")
         btn_frame.pack()
-        
         self.led_buttons = {}
         for led in ['OD', 'pH', 'DO']:
             btn = ctk.CTkButton(btn_frame, text=f"{led} LED: OFF",
@@ -682,7 +644,6 @@ class DeveloperFrame(ctk.CTkFrame):
                               width=100)
             btn.pack(side="left", padx=5)
             self.led_buttons[led] = btn
-
     def _toggle_led(self, led_name):
         current_state = GPIO.input(self.pump_controller.led_pins[led_name])
         new_state = not current_state
@@ -691,20 +652,16 @@ class DeveloperFrame(ctk.CTkFrame):
             text=f"{led_name} LED: {'ON' if new_state else 'FAIL' if new_state is None else 'OFF'}",
             fg_color=DEV_COLOR if new_state else BTN_BG
         )
-
     def _run_pump(self, pump_num, direction):
         threading.Thread(
             target=self.pump_controller.pump_action,
             args=(pump_num, direction),
             daemon=True
         ).start()
-
     def _stop_pump(self, pump_num):
-        pass  # Add interrupt logic if needed
-
+        pass
     def _set_stir_speed(self, speed):
         self.pump_controller.set_stir_speed(float(speed))
-
     def _create_back_button(self):
         back_button = ctk.CTkButton(
             self,
