@@ -274,6 +274,8 @@ class pHFrame(ParameterFrame):
         self.live_time = []
         self.live_voltage = []
         self.adc_available = False
+        self.bangbang_thread = None
+        self.bangbang_running = threading.Event()
         threading.Thread(target=self._init_adc, daemon=True).start()
     def _init_adc(self):
         try:
@@ -375,7 +377,6 @@ class pHFrame(ParameterFrame):
         if self.live_voltage:
             avg = sum(self.live_voltage) / len(self.live_voltage)
             avg_text = f"Average Live pH: {avg:.3f}"
-        # Place at axes fraction (0.02, 0.98) for upper left, with white text and a dark background
         self.ax.text(0.02, 0.98, avg_text, transform=self.ax.transAxes,
                      fontsize=14, color='white', va='top', ha='left',
                      bbox=dict(facecolor=BG_DARK, edgecolor='none', boxstyle='round,pad=0.3', alpha=0.8))
@@ -425,7 +426,31 @@ class pHFrame(ParameterFrame):
             self.after(500, self._schedule_plot_update)
         else:
             self._update_plot()
-
+    def update_process_controls(self):
+        super().update_process_controls()
+        # Start or stop bang-bang controller thread based on process state
+        if self.controller.process_active and not self.bangbang_running.is_set():
+            self.bangbang_running.set()
+            self.bangbang_thread = threading.Thread(target=self._bangbang_controller_loop, daemon=True)
+            self.bangbang_thread.start()
+        elif not self.controller.process_active and self.bangbang_running.is_set():
+            self.bangbang_running.clear()
+    def _bangbang_controller_loop(self):
+        while self.bangbang_running.is_set():
+            avg_ph = None
+            if self.live_voltage:
+                avg_ph = sum(self.live_voltage) / len(self.live_voltage)
+            setpoint = getattr(self.controller, "ph_setpoint", None)
+            if avg_ph is not None and setpoint is not None:
+                if avg_ph < setpoint:
+                    # Run Pump 1 (dir=1 for "right", 50 steps, slow speed)
+                    threading.Thread(
+                        target=self.controller.frames["DeveloperFrame"].pump_controller.pump_action,
+                        args=(1, 1, 50, 0.005),
+                        daemon=True
+                    ).start()
+            # Check every 1 second
+            time.sleep(1)
 
 class DOFrame(ParameterFrame):
     def __init__(self, parent, controller):
