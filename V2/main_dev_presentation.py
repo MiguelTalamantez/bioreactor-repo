@@ -475,6 +475,10 @@ class pHFrame(ParameterFrame):
                         error = setpoint-short_moving_avg
                         error_sum += error
                         response = 0.005 * 1/( error + 0.1 ) - 0.0000001 * error_sum
+                        print("error")
+                        print(error)
+                        print("response")
+                        print(response)
                         if short_moving_avg is not None and setpoint is not None and error < 0:
                             if pump_controller:
                                 pump_controller.pump_action(1, 1, steps=800, speed=response)
