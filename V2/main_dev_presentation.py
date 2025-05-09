@@ -386,10 +386,10 @@ class pHFrame(ParameterFrame):
         setpoint = getattr(self.controller, "ph_setpoint", None)
         if setpoint is not None:
             self.ax.axhline(setpoint, color="#FFD700", linestyle=":", linewidth=2, label="pH Setpoint")
-        avg_text = "Average Live pH: --"
+        avg_text = "Raw pH (V): --"
         if self.live_voltage:
             avg_ph = sum(self.live_voltage) / len(self.live_voltage)
-            avg_text = f"Average Live pH: {avg_ph:.3f}"
+            avg_text = f"Raw pH (V): {avg_ph:.3f}"
         self.ax.text(0.02, 0.98, avg_text, transform=self.ax.transAxes,
                      fontsize=14, color='white', va='top', ha='left',
                      bbox=dict(facecolor=BG_DARK, edgecolor='none', boxstyle='round,pad=0.3', alpha=0.8))
