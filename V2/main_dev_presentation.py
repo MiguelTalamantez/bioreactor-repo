@@ -274,7 +274,10 @@ class pHFrame(ParameterFrame):
         self.live_time = []
         self.live_voltage = []
         self.adc_available = False
+        self.control_thread = None
+        self.control_running = threading.Event()
         threading.Thread(target=self._init_adc, daemon=True).start()
+
     def _init_adc(self):
         try:
             self.i2c = busio.I2C(board.SCL, board.SDA)
@@ -282,8 +285,9 @@ class pHFrame(ParameterFrame):
             self.ads.gain = 1
             self.ph_channel = AnalogIn(self.ads, ADS.P0)
             self.adc_available = True
-        except Exception as e:
+        except Exception:
             self.adc_available = False
+
     def _add_ph_graph(self):
         self.graph_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         self.graph_frame.pack(pady=(2, 2), padx=4, fill="both", expand=True)
@@ -301,6 +305,7 @@ class pHFrame(ParameterFrame):
         self.set_ph = []
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)
         self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
+
     def _add_improved_setpoint_controls(self):
         control_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         control_frame.pack(pady=(2, 8), padx=4, fill="x")
@@ -346,6 +351,7 @@ class pHFrame(ParameterFrame):
             text_color=LABEL_COLOR
         )
         self.live_status.pack(side="left", padx=10)
+
     def _add_setpoint(self):
         try:
             time_val = float(self.time_entry.get())
@@ -357,11 +363,13 @@ class pHFrame(ParameterFrame):
             self.ph_entry.delete(0, 'end')
         except ValueError:
             pass
+
     def _remove_setpoint(self):
         if len(self.set_ph) > 0:
             self.set_ph.pop()
             self.time_points.pop()
             self._update_plot()
+
     def _update_plot(self):
         self.ax.clear()
         self.ax.step(self.time_points, self.set_ph, where='post',
@@ -375,7 +383,6 @@ class pHFrame(ParameterFrame):
         if self.live_voltage:
             avg = sum(self.live_voltage) / len(self.live_voltage)
             avg_text = f"Average Live pH: {avg:.3f}"
-        # Place at axes fraction (0.02, 0.98) for upper left, with white text and a dark background
         self.ax.text(0.02, 0.98, avg_text, transform=self.ax.transAxes,
                      fontsize=14, color='white', va='top', ha='left',
                      bbox=dict(facecolor=BG_DARK, edgecolor='none', boxstyle='round,pad=0.3', alpha=0.8))
@@ -384,6 +391,7 @@ class pHFrame(ParameterFrame):
         self.ax.legend(facecolor=BG_MED, labelcolor='white')
         self.ax.grid(color='#4a4a4a', linestyle='--')
         self.canvas.draw()
+
     def _toggle_live_ph(self):
         if not self.adc_available:
             self.live_status.configure(text="ADC not found")
@@ -392,6 +400,7 @@ class pHFrame(ParameterFrame):
             self._stop_live_ph()
         else:
             self._start_live_ph()
+
     def _start_live_ph(self):
         self.live_running.set()
         self.live_time = []
@@ -402,10 +411,12 @@ class pHFrame(ParameterFrame):
         self.live_thread = threading.Thread(target=self._live_ph_loop, daemon=True)
         self.live_thread.start()
         self._schedule_plot_update()
+
     def _stop_live_ph(self):
         self.live_running.clear()
         self.live_btn.configure(text="Start Live pH Read")
         self.live_status.configure(text="Stopped")
+
     def _live_ph_loop(self):
         while self.live_running.is_set():
             t = (time.time() - self.live_start_time) / 60.0
@@ -419,12 +430,47 @@ class pHFrame(ParameterFrame):
                 self.live_time.pop(0)
                 self.live_voltage.pop(0)
             time.sleep(0.5)
+
     def _schedule_plot_update(self):
         if self.live_running.is_set():
             self._update_plot()
             self.after(500, self._schedule_plot_update)
         else:
             self._update_plot()
+
+    def update_process_controls(self):
+        super().update_process_controls()
+        # Start or stop the controller thread based on process state
+        if self.controller.process_active and not self.control_running.is_set():
+            self.control_running.set()
+            self.control_thread = threading.Thread(target=self._controller_loop, daemon=True)
+            self.control_thread.start()
+        elif not self.controller.process_active and self.control_running.is_set():
+            self.control_running.clear()
+
+    def _controller_loop(self):
+        # Get the pump controller from DeveloperFrame
+        dev_frame = self.controller.frames.get("DeveloperFrame", None)
+        pump_controller = dev_frame.pump_controller if dev_frame else None
+        while self.control_running.is_set():
+            avg_ph = None
+            if self.live_voltage:
+                avg_ph = sum(self.live_voltage) / len(self.live_voltage)
+            setpoint = getattr(self.controller, "ph_setpoint", None)
+            if avg_ph is not None and setpoint is not None:
+                if avg_ph < setpoint:
+                    # Run Pump 1 (dir=1, keep running until pH >= setpoint or process stops)
+                    while self.control_running.is_set():
+                        avg_ph = sum(self.live_voltage) / len(self.live_voltage) if self.live_voltage else None
+                        if avg_ph is not None and avg_ph < setpoint:
+                            if pump_controller:
+                                pump_controller.pump_action(1, 1, steps=10, speed=0.01)
+                            else:
+                                break
+                        else:
+                            break
+                        time.sleep(0.1)
+            time.sleep(1)
 
 
 class DOFrame(ParameterFrame):
