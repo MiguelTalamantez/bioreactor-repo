@@ -474,7 +474,7 @@ class pHFrame(ParameterFrame):
                         short_moving_avg = sum(self._raw_to_ph(v) for v in self.live_voltage[-5:]) / 5 if self.live_voltage else None
                         error = setpoint-short_moving_avg
                         error_sum += error
-                        response = round(0.005 * 1/( abs(error) + 0.1 ),4)
+                        response = round(0.007 * 1/( abs(error) + 0.1 ),4)
                         print("error")
                         print(error)
                         print("response")
