@@ -464,7 +464,7 @@ class pHFrame(ParameterFrame):
             setpoint = getattr(self.controller, "ph_setpoint", None)
             if avg_ph is not None and setpoint is not None:
                 # CHANGE: Run pump if avg_ph > setpoint (above the line)
-                if avg_ph > setpoint:
+                if self.live_voltage > setpoint:
                     while self.control_running.is_set():
                         avg_ph = sum(self._raw_to_ph(v) for v in self.live_voltage) / len(self.live_voltage) if self.live_voltage else None
                         setpoint = getattr(self.controller, "ph_setpoint", None)
