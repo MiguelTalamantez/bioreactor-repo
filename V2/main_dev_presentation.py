@@ -275,7 +275,7 @@ class pHFrame(ParameterFrame):
         self.live_voltage = []
         self.adc_available = False
         self.control_thread = None
-        self.control_running = threading.Event()
+        self.control_running = threading.Event()  # <-- Fix: define this attribute
         threading.Thread(target=self._init_adc, daemon=True).start()
 
     def _init_adc(self):
