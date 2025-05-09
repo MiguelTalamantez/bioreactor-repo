@@ -5,13 +5,13 @@ import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
-import RPi.GPIO as GPIO # type: ignore
+import RPi.GPIO as GPIO
 import threading
 import time
-import board # type: ignore
-import busio # type: ignore
-import adafruit_ads1x15.ads1115 as ADS # type: ignore
-from adafruit_ads1x15.analog_in import AnalogIn # type: ignore
+import board
+import busio
+import adafruit_ads1x15.ads1115 as ADS
+from adafruit_ads1x15.analog_in import AnalogIn
 
 HEADER_COLOR = "#B0C4DE"
 LABEL_COLOR = "#E0E0E0"
@@ -24,19 +24,21 @@ BG_MED = "#2b2b2b"
 BTN_BG = "#404040"
 DEV_COLOR = "#8E44AD"
 
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
+
 class EnhancedKPMP10PumpController:
     def __init__(self, pump_config=None):
         self.pumps = {
-            1: {'step': 19, 'dir': 21},
-            2: {'step': 31, 'dir': 29},
-            3: {'step': 40, 'dir': 37},
-            4: {'step': 35, 'dir': 33}
+            1: {'step': 10, 'dir': 9},
+            2: {'step': 6, 'dir': 5},
+            3: {'step': 21, 'dir': 26},
+            4: {'step': 19, 'dir': 13}
         }
-        self.stir_pin = 38
-        self.led_pins = {'OD': 11, 'pH': 13, 'DO': 15}
+        self.stir_pin = 16
+        self.led_pins = {'OD': 17, 'pH': 27, 'DO': 22}
         self._setup_hardware()
     def _setup_hardware(self):
-        GPIO.setwarnings(False)
         for p in self.pumps.values():
             GPIO.setup(p['step'], GPIO.OUT)
             GPIO.setup(p['dir'], GPIO.OUT)
@@ -59,7 +61,6 @@ class EnhancedKPMP10PumpController:
         GPIO.output(self.led_pins[led_name], state)
     def cleanup(self):
         self.pwm.stop()
-        GPIO.cleanup()
 
 class App(ctk.CTk):
     def __init__(self):
@@ -73,7 +74,7 @@ class App(ctk.CTk):
         self.current_frame = None
         self.pump_assignments = {
             "Pump 1": "HCl",
-            "Pump 2": "NaOH", 
+            "Pump 2": "NaOH",
             "Pump 3": "Media",
             "Pump 4": "Waste"
         }
@@ -271,6 +272,9 @@ class pHFrame(ParameterFrame):
         self.live_running = threading.Event()
         self.live_time = []
         self.live_voltage = []
+        self.adc_available = False
+        threading.Thread(target=self._init_adc, daemon=True).start()
+    def _init_adc(self):
         try:
             self.i2c = busio.I2C(board.SCL, board.SDA)
             self.ads = ADS.ADS1115(self.i2c, address=0x48)
@@ -278,7 +282,6 @@ class pHFrame(ParameterFrame):
             self.ph_channel = AnalogIn(self.ads, ADS.P0)
             self.adc_available = True
         except Exception as e:
-            print(f"ADC init failed: {e}")
             self.adc_available = False
     def _add_ph_graph(self):
         self.graph_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
@@ -352,7 +355,7 @@ class pHFrame(ParameterFrame):
             self.time_entry.delete(0, 'end')
             self.ph_entry.delete(0, 'end')
         except ValueError:
-            print("Invalid input values")
+            pass
     def _remove_setpoint(self):
         if len(self.set_ph) > 0:
             self.set_ph.pop()
@@ -396,7 +399,7 @@ class pHFrame(ParameterFrame):
             t = (time.time() - self.live_start_time) / 60.0
             try:
                 voltage = self.ph_channel.voltage
-            except Exception as e:
+            except Exception:
                 voltage = 0
             self.live_time.append(t)
             self.live_voltage.append(voltage)
@@ -657,3 +660,4 @@ if __name__ == "__main__":
             dev_frame = app.frames.get("DeveloperFrame", None)
             if dev_frame and hasattr(dev_frame, "pump_controller"):
                 dev_frame.pump_controller.cleanup()
+        GPIO.cleanup()
