@@ -6,10 +6,6 @@ matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import RPi.GPIO as GPIO
-if GPIO.getmode() is None:
-    GPIO.setmode(GPIO.BOARD)
-elif GPIO.getmode() != GPIO.BOARD:
-    raise RuntimeError("GPIO mode already set to a different mode!")
 import threading
 import time
 import board
@@ -17,8 +13,9 @@ import busio
 import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 
-# GPIO.setmode(GPIO.BOARD)
-# GPIO.setwarnings(False)
+# Use BCM mode (Blinka will set this automatically, but it's safe to set here too)
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
 
 HEADER_COLOR = "#B0C4DE"
 LABEL_COLOR = "#E0E0E0"
@@ -33,14 +30,16 @@ DEV_COLOR = "#8E44AD"
 
 class EnhancedKPMP10PumpController:
     def __init__(self, pump_config=None):
+        # BOARD: 19,21,31,29,40,37,35,33,36,11,13,15
+        # BCM:   10,9,6,5,21,26,19,13,16,17,27,22
         self.pumps = {
-            1: {'step': 19, 'dir': 21},
-            2: {'step': 31, 'dir': 29},
-            3: {'step': 40, 'dir': 37},
-            4: {'step': 35, 'dir': 33}
+            1: {'step': 10, 'dir': 9},
+            2: {'step': 6, 'dir': 5},
+            3: {'step': 21, 'dir': 26},
+            4: {'step': 19, 'dir': 13}
         }
-        self.stir_pin = 36
-        self.led_pins = {'OD': 11, 'pH': 13, 'DO': 15}
+        self.stir_pin = 16
+        self.led_pins = {'OD': 17, 'pH': 27, 'DO': 22}
         self._setup_hardware()
     def _setup_hardware(self):
         for p in self.pumps.values():
