@@ -461,16 +461,23 @@ class pHFrame(ParameterFrame):
             avg_ph = None
             if self.live_voltage:
                 avg_ph = sum(self._raw_to_ph(v) for v in self.live_voltage) / len(self.live_voltage)
+                short_moving_avg = sum(self._raw_to_ph(v) for v in self.live_voltage[-5:]) / 5
             setpoint = getattr(self.controller, "ph_setpoint", None)
+            error = setpoint-short_moving_avg
+            error_sum = error
             if avg_ph is not None and setpoint is not None:
                 # CHANGE: Run pump if avg_ph > setpoint (above the line)
-                if self.live_voltage > setpoint:
+                if error < 0:
                     while self.control_running.is_set():
-                        avg_ph = sum(self._raw_to_ph(v) for v in self.live_voltage) / len(self.live_voltage) if self.live_voltage else None
+                        #avg_ph = sum(self._raw_to_ph(v) for v in self.live_voltage) / len(self.live_voltage) if self.live_voltage else None
                         setpoint = getattr(self.controller, "ph_setpoint", None)
-                        if avg_ph is not None and setpoint is not None and avg_ph > setpoint:
+                        short_moving_avg = sum(self._raw_to_ph(v) for v in self.live_voltage[-5:]) / 5 if self.live_voltage else None
+                        error = setpoint-short_moving_avg
+                        error_sum += error
+                        response = 0.005 * 1/( error + 0.1 ) - 0.0000001 * error_sum
+                        if short_moving_avg is not None and setpoint is not None and error < 0:
                             if pump_controller:
-                                pump_controller.pump_action(1, 1, steps=800, speed=0.001)
+                                pump_controller.pump_action(1, 1, steps=800, speed=response)
                             else:
                                 break
                         else:
