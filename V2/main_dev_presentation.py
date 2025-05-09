@@ -38,7 +38,7 @@ class EnhancedKPMP10PumpController:
             3: {'step': 21, 'dir': 26},
             4: {'step': 19, 'dir': 13}
         }
-        self.stir_pin = 16
+        self.stir_pin = 20
         self.led_pins = {'OD': 17, 'pH': 27, 'DO': 22}
         self._setup_hardware()
     def _setup_hardware(self):
