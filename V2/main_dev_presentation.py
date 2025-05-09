@@ -8,6 +8,8 @@ from matplotlib.figure import Figure
 import RPi.GPIO as GPIO
 import threading
 import time
+import board
+import busio
 
 # Hardware Constants
 STEP_PIN = 19
@@ -701,5 +703,5 @@ if __name__ == "__main__":
         app = App()
         app.mainloop()
     finally:
-        if hasattr(App.frames.get("DeveloperFrame", None), "pump_controller"):
+        if hasattr(app.frames.get("DeveloperFrame", None), "pump_controller"):
             app.frames["DeveloperFrame"].pump_controller.cleanup()
