@@ -1,16 +1,13 @@
-import time
-import board
-import busio
 import customtkinter as ctk
 import tkinter as tk
-from collections import deque
-import adafruit_ads1x15.ads1115 as ADS
-from adafruit_ads1x15.analog_in import AnalogIn
-import RPi.GPIO as GPIO
+from datetime import timedelta
 import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+import RPi.GPIO as GPIO
+import threading
+import time
 
 # Hardware Constants
 STEP_PIN = 19
@@ -36,7 +33,7 @@ class EnhancedKPMP10PumpController:
             3: {'step': 40, 'dir': 37},
             4: {'step': 35, 'dir': 33}
         }
-        self.stir_pin = 36
+        self.stir_pin = 38
         self.led_pins = {'OD': 11, 'pH': 13, 'DO': 15}
         GPIO.setmode(GPIO.BOARD)
         self._setup_hardware()
@@ -71,113 +68,10 @@ class EnhancedKPMP10PumpController:
         self.pwm.stop()
         GPIO.cleanup()
 
-class DataCollectionFrame(ctk.CTkFrame):
-    def __init__(self, parent, controller):
-        super().__init__(parent, fg_color=BG_DARK)
-        self.controller = controller
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
-        
-        self.i2c = busio.I2C(board.SCL, board.SDA)
-        self.ads_devices = self._initialize_ads1115()
-        self.channels = self._create_analog_channels()
-        self.num_channels = len(self.channels)
-        
-        self.canvas = tk.Canvas(self, bg=BG_DARK, highlightthickness=0)
-        self.canvas.pack(fill='both', expand=True, padx=10, pady=10)
-        
-        self.max_points = 100
-        self.time_data = deque(maxlen=self.max_points)
-        self.voltage_data = [deque(maxlen=self.max_points) for _ in range(self.num_channels)]
-        self.colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
-                      '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
-                      '#bcbd22', '#17becf', '#1a55FF', '#FF1493']
-        
-        self._add_back_button()
-        self.update_interval = 200
-        self.update_plot()
-
-    def _initialize_ads1115(self):
-        devices = []
-        for addr in [0x48, 0x4A, 0x4B]:
-            try:
-                ads = ADS.ADS1115(self.i2c, address=addr)
-                ads.gain = 1
-                devices.append(ads)
-            except Exception:
-                pass
-        return devices
-
-    def _create_analog_channels(self):
-        channels = []
-        for ads in self.ads_devices:
-            for pin in (ADS.P0, ADS.P1, ADS.P2, ADS.P3):
-                channels.append(AnalogIn(ads, pin))
-        return channels
-
-    def _add_back_button(self):
-        back_button = ctk.CTkButton(
-            self,
-            text="Back to Setup",
-            command=lambda: self.controller.show_frame("SetupFrame"),
-            font=("Roboto Mono", 14),
-            corner_radius=8,
-            fg_color=BTN_BG,
-            text_color=HEADER_COLOR
-        )
-        back_button.place(relx=0.5, rely=1.0, x=0, y=-10, anchor="s")
-
-    def update_plot(self):
-        try:
-            voltages = [chan.voltage for chan in self.channels]
-            current_time = time.time()
-            
-            self.time_data.append(current_time)
-            for i in range(self.num_channels):
-                self.voltage_data[i].append(voltages[i])
-            
-            self._draw_graph()
-            
-        except Exception as e:
-            print(f"Data collection error: {e}")
-        
-        self.after(self.update_interval, self.update_plot)
-
-    def _draw_graph(self):
-        self.canvas.delete("all")
-        width = self.canvas.winfo_width()
-        height = self.canvas.winfo_height()
-        
-        margin = 50
-        self.canvas.create_line(margin, margin, margin, height-margin, fill='white')
-        self.canvas.create_line(margin, height-margin, width-margin, height-margin, fill='white')
-        
-        if len(self.time_data) < 2:
-            return
-            
-        time_span = max(20, self.time_data[-1]-self.time_data[0])
-        x_scale = (width - 2*margin) / time_span
-        y_scale = (height - 2*margin) / 4.096
-        
-        for ch in range(self.num_channels):
-            points = []
-            for i, (t, v) in enumerate(zip(self.time_data, self.voltage_data[ch])):
-                x = margin + (t - self.time_data[0]) * x_scale
-                y = height - margin - v * y_scale
-                points.extend([x, y])
-            
-            if len(points) > 2:
-                self.canvas.create_line(
-                    *points, 
-                    fill=self.colors[ch % len(self.colors)], 
-                    width=1, 
-                    smooth=True
-                )
-
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Bioreactor Control v3.0")
+        self.title("Bioreactor Control v2.1")
         self.geometry("800x480")
         self.resizable(False, False)
         ctk.set_appearance_mode("dark")
@@ -228,7 +122,7 @@ class App(ctk.CTk):
                 text=text,
                 command=lambda name=frame_name: self.show_frame(name),
                 height=60,
-                font=("Roboto Mono", 15),
+                font=("Roboto Mono", 20),
                 border_width=1,
                 corner_radius=8,
                 fg_color=BTN_BG,
@@ -243,8 +137,7 @@ class App(ctk.CTk):
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
 
-        for F in (pHFrame, DOFrame, ODFrame, TempFrame, StirringFrame, 
-                FlowFrame, SetupFrame, DeveloperFrame, DataCollectionFrame):
+        for F in (pHFrame, DOFrame, ODFrame, TempFrame, StirringFrame, FlowFrame, SetupFrame, DeveloperFrame):
             frame = F(container, self)
             self.frames[F.__name__] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -306,7 +199,7 @@ class ParameterFrame(ctk.CTkFrame):
         self.process_text = ctk.CTkLabel(
             control_frame,
             text=f"Process Active: {self.controller.process_name}",
-            font=("Roboto Mono", 14),
+            font=("Roboto Mono", 20),
             text_color=LABEL_COLOR
         )
         self.process_text.pack(side="left", padx=10)
@@ -314,7 +207,7 @@ class ParameterFrame(ctk.CTkFrame):
         self.timer_label = ctk.CTkLabel(
             control_frame,
             text="00:00:00",
-            font=("Roboto Mono", 14, "bold"),
+            font=("Roboto Mono", 20, "bold"),
             text_color=HEADER_COLOR
         )
         self.timer_label.pack(side="left", padx=10)
@@ -404,6 +297,21 @@ class pHFrame(ParameterFrame):
         self._add_ph_graph()
         self._add_improved_setpoint_controls()
 
+        # --- ADC & Data Buffer Initialization ---
+        self.i2c = busio.I2C(board.SCL, board.SDA)
+        self.ads = ADS.ADS1115(self.i2c, address=0x48)
+        self.ads.gain = 1
+        self.chan0 = AnalogIn(self.ads, ADS.P0)
+
+        self.max_points = 100
+        self.time_data = deque(maxlen=self.max_points)
+        self.voltage_data = deque(maxlen=self.max_points)
+        self._start_time = None
+
+        # Start periodic update
+        self.update_interval = 200  # ms
+        self._update_ph_reading()
+
     def _add_ph_graph(self):
         self.graph_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
         self.graph_frame.pack(pady=(2, 2), padx=4, fill="both", expand=True)
@@ -414,7 +322,7 @@ class pHFrame(ParameterFrame):
         self.ax.xaxis.label.set_color('white')
         self.ax.yaxis.label.set_color('white')
         self.ax.spines['bottom'].set_color('white')
-        self.ax.spines['top'].set_color('white') 
+        self.ax.spines['top'].set_color('white')
         self.ax.spines['right'].set_color('white')
         self.ax.spines['left'].set_color('white')
         self.time_points = []
@@ -422,59 +330,37 @@ class pHFrame(ParameterFrame):
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)
         self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
 
-    def _add_improved_setpoint_controls(self):
-        control_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
-        control_frame.pack(pady=(2, 8), padx=4, fill="x")
-        control_frame.grid_columnconfigure(0, weight=1)
-        control_frame.grid_columnconfigure(1, weight=1)
-        control_frame.grid_columnconfigure(2, weight=1)
-        ctk.CTkLabel(control_frame, text="Time (min):", 
-                   font=("Roboto Mono", 13)).grid(row=0, column=0, padx=2, sticky="e")
-        self.time_entry = ctk.CTkEntry(control_frame, width=70, font=("Roboto Mono", 13))
-        self.time_entry.grid(row=0, column=1, padx=2, sticky="w")
-        ctk.CTkLabel(control_frame, text="Set pH:", 
-                   font=("Roboto Mono", 13)).grid(row=0, column=2, padx=2, sticky="e")
-        self.ph_entry = ctk.CTkEntry(control_frame, width=70, font=("Roboto Mono", 13))
-        self.ph_entry.grid(row=0, column=3, padx=2, sticky="w")
-        btn_frame = ctk.CTkFrame(control_frame, fg_color="transparent")
-        btn_frame.grid(row=0, column=4, columnspan=2, padx=5)
-        ctk.CTkButton(btn_frame, text="Add Setpoint",
-                      command=self._add_setpoint,
-                      fg_color=BTN_BG,
-                      text_color=NAV_TEXT_COLOR,
-                      font=("Roboto Mono", 13),
-                      width=100).pack(side="left", padx=2)
-        ctk.CTkButton(btn_frame, text="Remove Last",
-                      command=self._remove_setpoint,
-                      fg_color=BTN_BG,
-                      text_color=NAV_TEXT_COLOR,
-                      font=("Roboto Mono", 13),
-                      width=100).pack(side="left", padx=2)
+    def _update_ph_reading(self):
+        import time
+        now = time.time()
+        if self._start_time is None:
+            self._start_time = now
 
-    def _add_setpoint(self):
         try:
-            time = float(self.time_entry.get())
-            ph = float(self.ph_entry.get())
-            self.set_ph.append(ph)
-            self.time_points.append(time)
-            self._update_plot()
-            self.time_entry.delete(0, 'end')
-            self.ph_entry.delete(0, 'end')
-        except ValueError:
-            print("Invalid input values")
+            voltage = self.chan0.voltage
+        except Exception as e:
+            print(f"ADC read error: {e}")
+            voltage = 0.0
 
-    def _remove_setpoint(self):
-        if len(self.set_ph) > 0:
-            self.set_ph.pop()
-            self.time_points.pop()
-            self._update_plot()
+        self.time_data.append(now - self._start_time)
+        self.voltage_data.append(voltage)
+        self._update_plot()
+        # Schedule next update
+        self.after(self.update_interval, self._update_ph_reading)
 
     def _update_plot(self):
         self.ax.clear()
-        self.ax.step(self.time_points, self.set_ph, where='post', 
-                   label='Set pH', color=SET_COLOR, linestyle='--')
-        self.ax.set_xlabel('Time (min)', color='white')
-        self.ax.set_ylabel('pH', color='white')
+        # Plot setpoints (step plot)
+        if self.time_points and self.set_ph:
+            self.ax.step(self.time_points, self.set_ph, where='post',
+                         label='Set pH', color=SET_COLOR, linestyle='--')
+
+        # Plot live voltage (line plot)
+        if len(self.time_data) > 1:
+            self.ax.plot(self.time_data, self.voltage_data, color='#FF0000', label='pH Voltage (Ch0)')
+
+        self.ax.set_xlabel('Time (s)', color='white')
+        self.ax.set_ylabel('Voltage (V)', color='white')
         self.ax.legend(facecolor=BG_MED, labelcolor='white')
         self.ax.grid(color='#4a4a4a', linestyle='--')
         self.canvas.draw()
@@ -524,19 +410,22 @@ class SetupFrame(ctk.CTkFrame):
         self._create_process_settings()
         self._create_pump_assignment_ui()
         self._add_dev_button()
-        self._add_data_collection_button()
+        self._add_save_data_button()
 
-    def _add_data_collection_button(self):
-        data_button = ctk.CTkButton(
+    def _add_save_data_button(self):
+        save_button = ctk.CTkButton(
             self,
-            text="Data Collection",
-            command=lambda: self.controller.show_frame("DataCollectionFrame"),
+            text="Save Data",
+            command=self._save_data,
             font=("Roboto Mono", 14),
             corner_radius=8,
             fg_color=BTN_BG,
             text_color=HEADER_COLOR
         )
-        data_button.place(relx=1.0, rely=1.0, x=-10, y=-110, anchor="se")
+        save_button.place(relx=1.0, rely=1.0, x=-10, y=-60, anchor="se")
+
+    def _save_data(self):
+        pass  # No functionality implemented
 
     def _add_dev_button(self):
         dev_button = ctk.CTkButton(
@@ -743,7 +632,7 @@ class DeveloperFrame(ctk.CTkFrame):
         ).start()
 
     def _stop_pump(self, pump_num):
-        pass
+        pass  # Add interrupt logic if needed
 
     def _set_stir_speed(self, speed):
         self.pump_controller.set_stir_speed(float(speed))
@@ -761,12 +650,9 @@ class DeveloperFrame(ctk.CTkFrame):
         back_button.place(relx=0.5, rely=1.0, x=0, y=-10, anchor="s")
 
 if __name__ == "__main__":
-    app = None  # Initialize app variable outside try block
     try:
         app = App()
         app.mainloop()
     finally:
-        # Check if app exists before accessing its properties
-        if app is not None and hasattr(app.frames.get("DeveloperFrame", None), "pump_controller"):
+        if hasattr(app.frames.get("DeveloperFrame", None), "pump_controller"):
             app.frames["DeveloperFrame"].pump_controller.cleanup()
-            
