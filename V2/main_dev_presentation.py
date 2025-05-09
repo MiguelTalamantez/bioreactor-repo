@@ -13,8 +13,8 @@ import busio
 import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 
-GPIO.setmode(GPIO.BOARD)
-GPIO.setwarnings(False)
+# GPIO.setmode(GPIO.BOARD)
+# GPIO.setwarnings(False)
 
 HEADER_COLOR = "#B0C4DE"
 LABEL_COLOR = "#E0E0E0"
