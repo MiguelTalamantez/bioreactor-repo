@@ -24,7 +24,7 @@ BG_MED = "#2b2b2b"
 BTN_BG = "#404040"
 DEV_COLOR = "#8E44AD"
 
-GPIO.setmode(GPIO.BOARD)
+# GPIO.setmode(GPIO.BOARD)
 
 class EnhancedKPMP10PumpController:
     def __init__(self, pump_config=None):
