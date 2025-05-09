@@ -371,7 +371,10 @@ class pHFrame(ParameterFrame):
             self._update_plot()
 
     def _raw_to_ph(self, raw):
-        return raw * (7 / 0.107)
+        # 0.107 (water) = 7 pH
+        # 0.171 (sprint) = 3 pH
+        
+        return (raw * (-62.5) + 13.6875)
 
     def _update_plot(self):
         self.ax.clear()
