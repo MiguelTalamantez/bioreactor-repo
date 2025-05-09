@@ -348,6 +348,53 @@ class pHFrame(ParameterFrame):
         # Schedule next update
         self.after(self.update_interval, self._update_ph_reading)
 
+    def _add_improved_setpoint_controls(self):
+        control_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
+        control_frame.pack(pady=(2, 8), padx=4, fill="x")
+        control_frame.grid_columnconfigure(0, weight=1)
+        control_frame.grid_columnconfigure(1, weight=1)
+        control_frame.grid_columnconfigure(2, weight=1)
+        ctk.CTkLabel(control_frame, text="Time (min):", 
+                   font=("Roboto Mono", 13)).grid(row=0, column=0, padx=2, sticky="e")
+        self.time_entry = ctk.CTkEntry(control_frame, width=70, font=("Roboto Mono", 13))
+        self.time_entry.grid(row=0, column=1, padx=2, sticky="w")
+        ctk.CTkLabel(control_frame, text="Set pH:", 
+                   font=("Roboto Mono", 13)).grid(row=0, column=2, padx=2, sticky="e")
+        self.ph_entry = ctk.CTkEntry(control_frame, width=70, font=("Roboto Mono", 13))
+        self.ph_entry.grid(row=0, column=3, padx=2, sticky="w")
+        btn_frame = ctk.CTkFrame(control_frame, fg_color="transparent")
+        btn_frame.grid(row=0, column=4, columnspan=2, padx=5)
+        ctk.CTkButton(btn_frame, text="Add Setpoint",
+                      command=self._add_setpoint,
+                      fg_color=BTN_BG,
+                      text_color=NAV_TEXT_COLOR,
+                      font=("Roboto Mono", 13),
+                      width=100).pack(side="left", padx=2)
+        ctk.CTkButton(btn_frame, text="Remove Last",
+                      command=self._remove_setpoint,
+                      fg_color=BTN_BG,
+                      text_color=NAV_TEXT_COLOR,
+                      font=("Roboto Mono", 13),
+                      width=100).pack(side="left", padx=2)
+
+    def _add_setpoint(self):
+        try:
+            time = float(self.time_entry.get())
+            ph = float(self.ph_entry.get())
+            self.set_ph.append(ph)
+            self.time_points.append(time)
+            self._update_plot()
+            self.time_entry.delete(0, 'end')
+            self.ph_entry.delete(0, 'end')
+        except ValueError:
+            print("Invalid input values")
+
+    def _remove_setpoint(self):
+        if len(self.set_ph) > 0:
+            self.set_ph.pop()
+            self.time_points.pop()
+            self._update_plot()
+
     def _update_plot(self):
         self.ax.clear()
         # Plot setpoints (step plot)
