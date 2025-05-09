@@ -262,7 +262,7 @@ class ParameterFrame(ctk.CTkFrame):
 
 class pHFrame(ParameterFrame):
     def __init__(self, parent, controller):
-        self.control_running = threading.Event()  # <-- define before super().__init__()
+        self.control_running = threading.Event()
         self.status_data = {
             "pH": {"current": 6.8, "set": 7.0, "units": ""},
             "Buffer": {"current": 250, "set": 300, "units": "mM"}
@@ -276,7 +276,6 @@ class pHFrame(ParameterFrame):
         self.live_voltage = []
         self.adc_available = False
         self.control_thread = None
-        self.control_running = threading.Event()  # <-- Fix: define this attribute
         threading.Thread(target=self._init_adc, daemon=True).start()
 
     def _init_adc(self):
@@ -371,24 +370,31 @@ class pHFrame(ParameterFrame):
             self.time_points.pop()
             self._update_plot()
 
+    def _raw_to_ph(self, raw):
+        # 0.0785 -> 7, so pH = raw * (7/0.0785)
+        return raw * (7 / 0.0785)
+
     def _update_plot(self):
         self.ax.clear()
+        # Plot setpoint steps as pH
         self.ax.step(self.time_points, self.set_ph, where='post',
                    label='Set pH', color=SET_COLOR, linestyle='--')
+        # Plot live readings as pH
         if self.live_time and self.live_voltage:
-            self.ax.plot(self.live_time, self.live_voltage, color="#FF6666", label="Live pH (V)")
+            ph_values = [self._raw_to_ph(v) for v in self.live_voltage]
+            self.ax.plot(self.live_time, ph_values, color="#FF6666", label="Live pH")
         setpoint = getattr(self.controller, "ph_setpoint", None)
         if setpoint is not None:
             self.ax.axhline(setpoint, color="#FFD700", linestyle=":", linewidth=2, label="pH Setpoint")
         avg_text = "Average Live pH: --"
         if self.live_voltage:
-            avg = sum(self.live_voltage) / len(self.live_voltage)
-            avg_text = f"Average Live pH: {avg:.3f}"
+            avg_ph = sum(self._raw_to_ph(v) for v in self.live_voltage) / len(self.live_voltage)
+            avg_text = f"Average Live pH: {avg_ph:.3f}"
         self.ax.text(0.02, 0.98, avg_text, transform=self.ax.transAxes,
                      fontsize=14, color='white', va='top', ha='left',
                      bbox=dict(facecolor=BG_DARK, edgecolor='none', boxstyle='round,pad=0.3', alpha=0.8))
         self.ax.set_xlabel('Time (min)', color='white')
-        self.ax.set_ylabel('pH / Voltage', color='white')
+        self.ax.set_ylabel('pH', color='white')
         self.ax.legend(facecolor=BG_MED, labelcolor='white')
         self.ax.grid(color='#4a4a4a', linestyle='--')
         self.canvas.draw()
@@ -438,37 +444,6 @@ class pHFrame(ParameterFrame):
             self.after(500, self._schedule_plot_update)
         else:
             self._update_plot()
-
-    def update_process_controls(self):
-        super().update_process_controls()
-        if self.controller.process_active and not self.control_running.is_set():
-            self.control_running.set()
-            self.control_thread = threading.Thread(target=self._controller_loop, daemon=True)
-            self.control_thread.start()
-        elif not self.controller.process_active and self.control_running.is_set():
-            self.control_running.clear()
-
-    def _controller_loop(self):
-        dev_frame = self.controller.frames.get("DeveloperFrame", None)
-        pump_controller = dev_frame.pump_controller if dev_frame else None
-        while self.control_running.is_set():
-            avg_ph = None
-            if self.live_voltage:
-                avg_ph = sum(self.live_voltage) / len(self.live_voltage)
-            setpoint = getattr(self.controller, "ph_setpoint", None)
-            if avg_ph is not None and setpoint is not None:
-                if avg_ph < setpoint:
-                    # Continuously run Pump 1 until pH >= setpoint or process stops
-                    while self.control_running.is_set():
-                        avg_ph = sum(self.live_voltage) / len(self.live_voltage) if self.live_voltage else None
-                        setpoint = getattr(self.controller, "ph_setpoint", None)
-                        if avg_ph is not None and setpoint is not None and avg_ph < setpoint:
-                           pump_controller.pump_action(1, 1, steps=200, speed=0.001)
-                           time.sleep(0.5)
-                        else:
-                            break
-                        time.sleep(0.1)
-            time.sleep(1)
 
 
 class DOFrame(ParameterFrame):
