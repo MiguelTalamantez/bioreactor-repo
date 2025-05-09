@@ -440,7 +440,6 @@ class pHFrame(ParameterFrame):
 
     def update_process_controls(self):
         super().update_process_controls()
-        # Start or stop the controller thread based on process state
         if self.controller.process_active and not self.control_running.is_set():
             self.control_running.set()
             self.control_thread = threading.Thread(target=self._controller_loop, daemon=True)
@@ -449,7 +448,6 @@ class pHFrame(ParameterFrame):
             self.control_running.clear()
 
     def _controller_loop(self):
-        # Get the pump controller from DeveloperFrame
         dev_frame = self.controller.frames.get("DeveloperFrame", None)
         pump_controller = dev_frame.pump_controller if dev_frame else None
         while self.control_running.is_set():
@@ -459,10 +457,11 @@ class pHFrame(ParameterFrame):
             setpoint = getattr(self.controller, "ph_setpoint", None)
             if avg_ph is not None and setpoint is not None:
                 if avg_ph < setpoint:
-                    # Run Pump 1 (dir=1, keep running until pH >= setpoint or process stops)
+                    # Continuously run Pump 1 until pH >= setpoint or process stops
                     while self.control_running.is_set():
                         avg_ph = sum(self.live_voltage) / len(self.live_voltage) if self.live_voltage else None
-                        if avg_ph is not None and avg_ph < setpoint:
+                        setpoint = getattr(self.controller, "ph_setpoint", None)
+                        if avg_ph is not None and setpoint is not None and avg_ph < setpoint:
                             if pump_controller:
                                 pump_controller.pump_action(1, 1, steps=10, speed=0.01)
                             else:
