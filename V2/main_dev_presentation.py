@@ -463,7 +463,8 @@ class pHFrame(ParameterFrame):
                         avg_ph = sum(self.live_voltage) / len(self.live_voltage) if self.live_voltage else None
                         setpoint = getattr(self.controller, "ph_setpoint", None)
                         if avg_ph is not None and setpoint is not None and avg_ph < setpoint:
-                           print("test")
+                           pump_controller.pump_action(1, 1, steps=5, speed=0.01)
+                           time.sleep(0.5)
                         else:
                             break
                         time.sleep(0.1)
