@@ -386,7 +386,7 @@ class pHFrame(ParameterFrame):
             self.ax.axhline(setpoint, color="#FFD700", linestyle=":", linewidth=2, label="pH Setpoint")
         avg_text = "Raw pH (V): --"
         if self.live_voltage:
-            avg_ph = sum(self._raw_to_ph(v) for v in self.live_voltage) / len(self.live_voltage)
+            avg_ph = sum(self.live_voltage) / len(self.live_voltage)
             avg_text = f"Raw pH (V): {avg_ph:.3f}"
         self.ax.text(0.02, 0.98, avg_text, transform=self.ax.transAxes,
                      fontsize=14, color='white', va='top', ha='left',
