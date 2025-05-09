@@ -8,12 +8,11 @@ from matplotlib.figure import Figure
 import RPi.GPIO as GPIO
 import threading
 import time
-
-# ADC imports
 import board
 import busio
 import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
+from collections import deque
 
 HEADER_COLOR = "#B0C4DE"
 LABEL_COLOR = "#E0E0E0"
@@ -36,7 +35,10 @@ class EnhancedKPMP10PumpController:
         }
         self.stir_pin = 38
         self.led_pins = {'OD': 11, 'pH': 13, 'DO': 15}
-        GPIO.setmode(GPIO.BOARD)
+        if GPIO.getmode() is None:
+            GPIO.setmode(GPIO.BOARD)
+        elif GPIO.getmode() != GPIO.BOARD:
+            raise RuntimeError("GPIO mode already set to a different mode!")
         self._setup_hardware()
     def _setup_hardware(self):
         GPIO.setwarnings(False)
@@ -675,9 +677,12 @@ class DeveloperFrame(ctk.CTkFrame):
         back_button.place(relx=0.5, rely=1.0, x=0, y=-10, anchor="s")
 
 if __name__ == "__main__":
+    app = None
     try:
         app = App()
         app.mainloop()
     finally:
-        if hasattr(app.frames.get("DeveloperFrame", None), "pump_controller"):
-            app.frames["DeveloperFrame"].pump_controller.cleanup()
+        if app is not None:
+            dev_frame = app.frames.get("DeveloperFrame", None)
+            if dev_frame and hasattr(dev_frame, "pump_controller"):
+                dev_frame.pump_controller.cleanup()
