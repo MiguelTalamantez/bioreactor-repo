@@ -520,10 +520,24 @@ class SetupFrame(ctk.CTkFrame):
         self.controller = controller
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
+        self._add_backup_dev_button()
         self._create_process_settings()
         self._create_pump_assignment_ui()
         self._add_dev_button()
         self._add_ph_setpoint_input()
+    
+    def _add_backup_dev_button(self):
+        backup_btn = ctk.CTkButton(
+            self,
+            text="Developer Mode (Backup)",
+            command=lambda: self.controller.show_frame("DeveloperFrame"),
+            font=("Roboto Mono", 13),
+            corner_radius=8,
+            fg_color=DEV_COLOR,
+            text_color="white"
+        )
+        backup_btn.pack(side="top", anchor="ne", padx=10, pady=10)
+    
     def _add_dev_button(self):
         dev_button = ctk.CTkButton(
             self,
