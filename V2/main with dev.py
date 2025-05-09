@@ -33,7 +33,7 @@ class EnhancedKPMP10PumpController:
             3: {'step': 40, 'dir': 37},
             4: {'step': 35, 'dir': 33}
         }
-        self.stir_pin = 36
+        self.stir_pin = 38
         self.led_pins = {'OD': 11, 'pH': 13, 'DO': 15}
         GPIO.setmode(GPIO.BOARD)
         self._setup_hardware()
@@ -122,7 +122,7 @@ class App(ctk.CTk):
                 text=text,
                 command=lambda name=frame_name: self.show_frame(name),
                 height=60,
-                font=("Roboto Mono", 15),
+                font=("Roboto Mono", 20),
                 border_width=1,
                 corner_radius=8,
                 fg_color=BTN_BG,
@@ -199,7 +199,7 @@ class ParameterFrame(ctk.CTkFrame):
         self.process_text = ctk.CTkLabel(
             control_frame,
             text=f"Process Active: {self.controller.process_name}",
-            font=("Roboto Mono", 14),
+            font=("Roboto Mono", 20),
             text_color=LABEL_COLOR
         )
         self.process_text.pack(side="left", padx=10)
@@ -207,7 +207,7 @@ class ParameterFrame(ctk.CTkFrame):
         self.timer_label = ctk.CTkLabel(
             control_frame,
             text="00:00:00",
-            font=("Roboto Mono", 14, "bold"),
+            font=("Roboto Mono", 20, "bold"),
             text_color=HEADER_COLOR
         )
         self.timer_label.pack(side="left", padx=10)
