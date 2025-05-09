@@ -24,7 +24,7 @@ BG_MED = "#2b2b2b"
 BTN_BG = "#404040"
 DEV_COLOR = "#8E44AD"
 
-# GPIO.setmode(GPIO.BOARD)
+GPIO.setmode(GPIO.BOARD)
 
 class EnhancedKPMP10PumpController:
     def __init__(self, pump_config=None):
@@ -269,7 +269,6 @@ class pHFrame(ParameterFrame):
         super().__init__(parent, controller)
         self._add_ph_graph()
         self._add_improved_setpoint_controls()
-        self._add_live_ph_button()
         self.live_thread = None
         self.live_running = threading.Event()
         self.live_time = []
@@ -315,7 +314,7 @@ class pHFrame(ParameterFrame):
         self.ph_entry = ctk.CTkEntry(control_frame, width=70, font=("Roboto Mono", 13))
         self.ph_entry.grid(row=0, column=3, padx=2, sticky="w")
         btn_frame = ctk.CTkFrame(control_frame, fg_color="transparent")
-        btn_frame.grid(row=0, column=4, columnspan=2, padx=5)
+        btn_frame.grid(row=0, column=4, columnspan=3, padx=5)
         ctk.CTkButton(btn_frame, text="Add Setpoint",
                       command=self._add_setpoint,
                       fg_color=BTN_BG,
@@ -328,6 +327,23 @@ class pHFrame(ParameterFrame):
                       text_color=NAV_TEXT_COLOR,
                       font=("Roboto Mono", 13),
                       width=100).pack(side="left", padx=2)
+        self.live_btn = ctk.CTkButton(
+            btn_frame,
+            text="Start Live pH Read",
+            command=self._toggle_live_ph,
+            fg_color=BTN_BG,
+            text_color=HEADER_COLOR,
+            font=("Roboto Mono", 13),
+            width=160
+        )
+        self.live_btn.pack(side="left", padx=2)
+        self.live_status = ctk.CTkLabel(
+            btn_frame,
+            text="",
+            font=("Roboto Mono", 13),
+            text_color=LABEL_COLOR
+        )
+        self.live_status.pack(side="left", padx=10)
     def _add_setpoint(self):
         try:
             time_val = float(self.time_entry.get())
@@ -355,26 +371,6 @@ class pHFrame(ParameterFrame):
         self.ax.legend(facecolor=BG_MED, labelcolor='white')
         self.ax.grid(color='#4a4a4a', linestyle='--')
         self.canvas.draw()
-    def _add_live_ph_button(self):
-        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.pack(pady=(0, 8), padx=4, fill="x")
-        self.live_btn = ctk.CTkButton(
-            btn_frame,
-            text="Start Live pH Read",
-            command=self._toggle_live_ph,
-            fg_color=BTN_BG,
-            text_color=HEADER_COLOR,
-            font=("Roboto Mono", 14),
-            width=180
-        )
-        self.live_btn.pack(side="left", padx=10)
-        self.live_status = ctk.CTkLabel(
-            btn_frame,
-            text="",
-            font=("Roboto Mono", 13),
-            text_color=LABEL_COLOR
-        )
-        self.live_status.pack(side="left", padx=10)
     def _toggle_live_ph(self):
         if not self.adc_available:
             self.live_status.configure(text="ADC not found")
