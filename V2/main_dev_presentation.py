@@ -12,7 +12,6 @@ import board
 import busio
 import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
-from collections import deque
 
 HEADER_COLOR = "#B0C4DE"
 LABEL_COLOR = "#E0E0E0"
@@ -25,20 +24,18 @@ BG_MED = "#2b2b2b"
 BTN_BG = "#404040"
 DEV_COLOR = "#8E44AD"
 
+GPIO.setmode(GPIO.BOARD)
+
 class EnhancedKPMP10PumpController:
-    def __init__(self, pump_config):
+    def __init__(self, pump_config=None):
         self.pumps = {
             1: {'step': 19, 'dir': 21},
             2: {'step': 31, 'dir': 29},
             3: {'step': 40, 'dir': 37},
             4: {'step': 35, 'dir': 33}
         }
-        self.stir_pin = 38
+        self.stir_pin = 36
         self.led_pins = {'OD': 11, 'pH': 13, 'DO': 15}
-        if GPIO.getmode() is None:
-            GPIO.setmode(GPIO.BOARD)
-        elif GPIO.getmode() != GPIO.BOARD:
-            raise RuntimeError("GPIO mode already set to a different mode!")
         self._setup_hardware()
     def _setup_hardware(self):
         GPIO.setwarnings(False)
@@ -115,7 +112,7 @@ class App(ctk.CTk):
                 text=text,
                 command=lambda name=frame_name: self.show_frame(name),
                 height=60,
-                font=("Roboto Mono", 20),
+                font=("Roboto Mono", 15),
                 border_width=1,
                 corner_radius=8,
                 fg_color=BTN_BG,
@@ -146,7 +143,6 @@ class App(ctk.CTk):
                 self.remaining_time = self.auto_shutoff_time * 60
                 self._tick_timer()
             self._update_all_process_controls()
-            print(f"Process '{self.process_name}' started")
     def stop_process(self):
         if self.process_active:
             self.process_active = False
@@ -154,7 +150,6 @@ class App(ctk.CTk):
                 self.after_cancel(self.timer_id)
                 self.timer_id = None
             self._update_all_process_controls()
-            print(f"Process '{self.process_name}' stopped")
     def _tick_timer(self):
         if self.process_active and self.auto_shutoff_enabled and self.remaining_time > 0:
             self.remaining_time -= 1
@@ -182,14 +177,14 @@ class ParameterFrame(ctk.CTkFrame):
         self.process_text = ctk.CTkLabel(
             control_frame,
             text=f"Process Active: {self.controller.process_name}",
-            font=("Roboto Mono", 20),
+            font=("Roboto Mono", 14),
             text_color=LABEL_COLOR
         )
         self.process_text.pack(side="left", padx=10)
         self.timer_label = ctk.CTkLabel(
             control_frame,
             text="00:00:00",
-            font=("Roboto Mono", 20, "bold"),
+            font=("Roboto Mono", 14, "bold"),
             text_color=HEADER_COLOR
         )
         self.timer_label.pack(side="left", padx=10)
@@ -467,20 +462,6 @@ class SetupFrame(ctk.CTkFrame):
         self._create_process_settings()
         self._create_pump_assignment_ui()
         self._add_dev_button()
-        self._add_save_data_button()
-    def _add_save_data_button(self):
-        save_button = ctk.CTkButton(
-            self,
-            text="Save Data",
-            command=self._save_data,
-            font=("Roboto Mono", 14),
-            corner_radius=8,
-            fg_color=BTN_BG,
-            text_color=HEADER_COLOR
-        )
-        save_button.place(relx=1.0, rely=1.0, x=-10, y=-60, anchor="se")
-    def _save_data(self):
-        pass
     def _add_dev_button(self):
         dev_button = ctk.CTkButton(
             self,
@@ -514,7 +495,6 @@ class SetupFrame(ctk.CTkFrame):
         new_name = self.process_entry.get()
         if new_name != self.controller.process_name:
             self.controller.process_name = new_name
-            print(f"Process name updated to: {new_name}")
             self.controller._update_all_process_controls()
     def _create_pump_assignment_ui(self):
         main_frame = ctk.CTkFrame(self, fg_color=BG_MED, corner_radius=8)
@@ -572,17 +552,14 @@ class SetupFrame(ctk.CTkFrame):
         self.shutoff_time_entry.bind("<Return>", self._update_shutoff_time)
     def _update_pump_assignment(self, pump, chemical):
         self.controller.pump_assignments[pump] = chemical
-        print(f"Updated {pump} to {chemical}")
     def _toggle_shutoff(self):
         self.controller.auto_shutoff_enabled = bool(self.shutoff_switch.get())
-        print(f"Auto-shutoff enabled: {self.controller.auto_shutoff_enabled}")
         self.controller._update_all_process_controls()
     def _update_shutoff_time(self, event=None):
         try:
             time_val = int(self.shutoff_time_entry.get())
             if time_val > 0:
                 self.controller.auto_shutoff_time = time_val
-                print(f"Auto-shutoff time set to: {time_val} min")
             else:
                 raise ValueError
         except ValueError:
@@ -593,7 +570,7 @@ class DeveloperFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=BG_DARK)
         self.controller = controller
-        self.pump_controller = EnhancedKPMP10PumpController({})
+        self.pump_controller = EnhancedKPMP10PumpController()
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self._create_pump_controls()
@@ -651,7 +628,7 @@ class DeveloperFrame(ctk.CTkFrame):
         new_state = not current_state
         self.pump_controller.led_control(led_name, new_state)
         self.led_buttons[led_name].configure(
-            text=f"{led_name} LED: {'ON' if new_state else 'FAIL' if new_state is None else 'OFF'}",
+            text=f"{led_name} LED: {'ON' if new_state else 'OFF'}",
             fg_color=DEV_COLOR if new_state else BTN_BG
         )
     def _run_pump(self, pump_num, direction):
